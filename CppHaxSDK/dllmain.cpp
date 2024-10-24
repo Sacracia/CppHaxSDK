@@ -5,10 +5,10 @@
 #include "logger/logger.h"
 
 void Start() {
-	AllocConsole();
-	freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
-
-	logger << "Hello world!" << 5 << 0x32 << end;
+	LOG_INIT();
+	LOG_INFO << "INFO" << LOG_FLUSH;
+	LOG_WARNING << "WARNING" << LOG_FLUSH;
+	LOG_ERROR << "ERROR" << LOG_FLUSH;
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {

@@ -1,41 +1,45 @@
 #pragma once
 
-#include <stdint.h>
-#include <iostream>
 #include <sstream>
-#include <fstream>
+#include <string_view>
+#include <iostream>
+#include <filesystem>
 
-class Logger : public std::ostream {
-public:
-    bool m_newLine = true;
-    std::ostringstream ss;
-public:
-    template <class T>
-    Logger& operator<<(const T& v)
-    {
-        std::cout << " << ";
-        if (m_newLine) {
-            ss << "[STARTOFLINE] ";
-            m_newLine = false;
-        }
-        ss << v;
-        return *this;
-    }
-};
+namespace logger {
+	struct Flush {};
 
-extern Logger logger;
+	class Logger {
+	public:
+		Logger() = default;
+	public:
+		template <typename T>
+		Logger& operator<<(const T& v) { 
+			m_ss << v; 
+			return *this;
+		}
+		void operator<<(const logger::Flush& v);
+	public:
+		Logger& LogInfo();
+		Logger& LogWarning();
+		Logger& LogError();
+	public:
+		void Init();
+	private:
+		void Flush();
+		void LogHeader(std::string_view level);
+		bool IsEmpty();
+	public:
+		const logger::Flush FLUSH{};
+	private:
+		std::ostringstream m_ss;
+		std::filesystem::path filePath;
+	};
 
-inline std::ostringstream& end(std::ostringstream& o) {
-    std::cout << "ENDL\n";
-    logger.m_newLine = true;
-    logger.ss << " [ENDOFLINE]\n";
-    /*std::ofstream file("tmp.txt", std::ios_base::app);
-    file << logger.ss.str();
-    file.close();*/
-    std::cout << logger.ss.str();
-    logger.ss.str("");
-    return logger.ss;
+	extern Logger g_logger;
 }
 
-#define LOG logger
-#define ENDL logger.endl
+#define LOG_INIT() logger::g_logger.Init()
+#define LOG_INFO logger::g_logger.LogInfo()
+#define LOG_WARNING logger::g_logger.LogWarning()
+#define LOG_ERROR logger::g_logger.LogError()
+#define LOG_FLUSH logger::g_logger.FLUSH
