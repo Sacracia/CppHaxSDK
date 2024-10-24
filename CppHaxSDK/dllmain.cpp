@@ -1,19 +1,20 @@
 ﻿#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <iostream>
 
-BOOL APIENTRY DllMain( HMODULE hModule,
-                       DWORD  ul_reason_for_call,
-                       LPVOID lpReserved
-                     )
-{
-    switch (ul_reason_for_call)
-    {
-    case DLL_PROCESS_ATTACH:
-    case DLL_THREAD_ATTACH:
-    case DLL_THREAD_DETACH:
-    case DLL_PROCESS_DETACH:
-        break;
-    }
-    return TRUE;
+#include "logger/logger.h"
+
+void Start() {
+	AllocConsole();
+	freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
+
+	logger << "Hello world!" << 5 << 0x32 << end;
+}
+
+bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {
+	if (reason == DLL_PROCESS_ATTACH) {
+		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Start, NULL, 0, NULL);
+	}
+	return true;
 }
 
