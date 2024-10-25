@@ -7,10 +7,10 @@
 #include <time.h>
 #include <iomanip>
 
-namespace logger {
+namespace haxsdk {
 	Logger g_logger;
 
-	void Logger::operator<<(const logger::Flush& v) {
+	void Logger::operator<<(const haxsdk::Flush& v) {
 		Flush();
 	}
 

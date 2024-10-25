@@ -72,19 +72,19 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
-    <IntDir>build\$(Platform)\$(Configuration)\</IntDir>
+    <IntDir>obj\$(Platform)\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -94,7 +94,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x86;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x86;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories);$(SolutionDir)CppHaxSDK\logger;$(SolutionDir)CppHaxSDK\gui</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -115,7 +115,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x86;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x86;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories);$(SolutionDir)CppHaxSDK\logger;$(SolutionDir)CppHaxSDK\gui</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -136,7 +136,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x64;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x64;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories);$(SolutionDir)CppHaxSDK\logger;$(SolutionDir)CppHaxSDK\gui</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -157,7 +157,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x64;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x64;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories);$(SolutionDir)CppHaxSDK\logger;$(SolutionDir)CppHaxSDK\gui</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
@@ -171,6 +171,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="gui\backend\opengl.h" />
+    <ClInclude Include="gui\gui.h" />
     <ClInclude Include="logger\logger.h" />
     <ClInclude Include="third_party\detours\x64\detours.h" />
     <ClInclude Include="third_party\detours\x64\detver.h" />
@@ -192,6 +194,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="gui\backend\opengl.cpp" />
+    <ClCompile Include="gui\gui.cpp" />
     <ClCompile Include="logger\logger.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />

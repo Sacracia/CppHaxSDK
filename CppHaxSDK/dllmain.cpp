@@ -2,13 +2,12 @@
 #include <windows.h>
 #include <iostream>
 
-#include "logger/logger.h"
+#include <logger.h>
+#include <gui.h>
 
 void Start() {
 	LOG_INIT();
-	LOG_INFO << "INFO" << LOG_FLUSH;
-	LOG_WARNING << "WARNING" << LOG_FLUSH;
-	LOG_ERROR << "ERROR" << LOG_FLUSH;
+	haxsdk::ImplementGui();
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {

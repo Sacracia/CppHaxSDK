@@ -69,6 +69,12 @@
     <ClInclude Include="logger\logger.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="gui\gui.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="gui\backend\opengl.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -105,6 +111,12 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="logger\logger.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="gui\gui.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="gui\backend\opengl.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
