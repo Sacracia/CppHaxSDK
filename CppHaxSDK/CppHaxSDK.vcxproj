@@ -184,6 +184,8 @@
     <ClInclude Include="third_party\imgui\backend\imgui_impl_dx11.h" />
     <ClInclude Include="third_party\imgui\backend\imgui_impl_dx9.h" />
     <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl2.h" />
+    <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl3.h" />
+    <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl3_loader.h" />
     <ClInclude Include="third_party\imgui\backend\imgui_impl_win32.h" />
     <ClInclude Include="third_party\imgui\imconfig.h" />
     <ClInclude Include="third_party\imgui\imgui.h" />
@@ -201,6 +203,7 @@
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx9.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_opengl2.cpp" />
+    <ClCompile Include="third_party\imgui\backend\imgui_impl_opengl3.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_win32.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp" />
     <ClCompile Include="third_party\imgui\imgui_demo.cpp" />

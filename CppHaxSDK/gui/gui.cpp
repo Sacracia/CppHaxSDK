@@ -28,19 +28,21 @@ namespace haxsdk {
 				if (moduleName == "d3d9.dll") {
 					LOG_INFO << "DIRECTX9" << LOG_FLUSH;
 				}
-				if (moduleName == "d3d10.dll") {
+				else if (moduleName == "d3d10.dll") {
 					LOG_INFO << "DIRECTX10" << LOG_FLUSH;
 				}
-				if (moduleName == "d3d11.dll") {
+				else if (moduleName == "d3d11.dll") {
 					LOG_INFO << "DIRECTX11" << LOG_FLUSH;
 				}
-				if (moduleName == "d3d12.dll") {
+				else if (moduleName == "d3d12.dll") {
 					LOG_INFO << "DIRECTX12" << LOG_FLUSH;
 				}
-				if (moduleName == "vulkan-1.dll") {
+				else if (moduleName == "vulkan-1.dll") {
 					LOG_INFO << "VULKAN" << LOG_FLUSH;
 				}
 			} while (Module32Next(snapshot, &me));
+
+
 		}
 
 		CloseHandle(snapshot);
