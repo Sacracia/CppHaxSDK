@@ -16,4 +16,3 @@ bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {
 	}
 	return true;
 }
-
