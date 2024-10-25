@@ -32,7 +32,7 @@ namespace logger {
 		const logger::Flush FLUSH{};
 	private:
 		std::ostringstream m_ss;
-		std::filesystem::path filePath;
+		std::filesystem::path m_filePath;
 	};
 
 	extern Logger g_logger;

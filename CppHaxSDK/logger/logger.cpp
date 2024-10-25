@@ -46,7 +46,7 @@ namespace logger {
 			m_ss << '\n';
 			std::cout << m_ss.str();
 
-			std::ofstream file(this->filePath, std::ios::app);
+			std::ofstream file(m_filePath, std::ios::app);
 			file << m_ss.str();
 			file.close();
 
@@ -74,6 +74,6 @@ namespace logger {
 		std::filesystem::rename(logPath, prevLogPath, errCode);
 		std::filesystem::remove(logPath, errCode);
 
-		this->filePath = logPath;
+		m_filePath = logPath;
 	}
 }
