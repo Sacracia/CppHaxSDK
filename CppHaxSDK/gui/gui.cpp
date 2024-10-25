@@ -41,8 +41,6 @@ namespace haxsdk {
 					LOG_INFO << "VULKAN" << LOG_FLUSH;
 				}
 			} while (Module32Next(snapshot, &me));
-
-
 		}
 
 		CloseHandle(snapshot);
