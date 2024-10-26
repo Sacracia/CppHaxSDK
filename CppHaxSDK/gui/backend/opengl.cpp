@@ -10,10 +10,10 @@
 #include <backend/imgui_impl_win32.h>
 
 using swapBuffers_t = bool(WINAPI*)(HDC);
-static swapBuffers_t oSwapBuffers;
+static swapBuffers_t oSwapBuffers; // original wglSwapBuffers
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-static WNDPROC oWndproc;
+static WNDPROC oWndproc; // original Wndproc
 static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
 		return true;
@@ -24,6 +24,7 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM l
 bool WINAPI HookedSwapBuffers(HDC hdc) {
 	static bool g_inited = false;
 	if (!g_inited) {
+		LOG_INFO << "Hello from hooked wglSwapBuffers!" << LOG_FLUSH;
 		HWND hwnd = WindowFromDC(hdc);
 		ImGui::CreateContext();
 		ImGui_ImplWin32_Init(hwnd);
@@ -55,10 +56,7 @@ namespace haxsdk::opengl {
 			LOG_ERROR << "Unable to find wglSwapBuffers" << LOG_FLUSH;
 			return;
 		}
-		else {
-			LOG_INFO << "wglSwapBuffers address " << oSwapBuffers << LOG_FLUSH;
-		}
-
+		LOG_INFO << "wglSwapBuffers address " << oSwapBuffers << LOG_FLUSH;
 		DetourTransactionBegin();
 		DetourAttach(&(PVOID&)oSwapBuffers, HookedSwapBuffers);
 		DetourTransactionCommit();
