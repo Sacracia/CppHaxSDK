@@ -140,7 +140,7 @@
     <Library Include="third_party\detours\x64\detours.lib" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="third_party\detours\x64\detours.pdb" />
     <None Include="third_party\detours\x86\detours.pdb" />
+    <None Include="third_party\detours\x64\detours.pdb" />
   </ItemGroup>
 </Project>
