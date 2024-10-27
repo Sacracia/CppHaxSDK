@@ -9,6 +9,7 @@
 
 #include <logger.h>
 #include <backend/opengl.h>
+#include <backend/directx9.h>
 
 namespace haxsdk {
 	void ImplementGui() {
@@ -22,23 +23,24 @@ namespace haxsdk {
 				std::string moduleName(me.szModule);
 				std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
 				if (moduleName == "opengl32.dll") {
-					LOG_INFO << "OPENGL32" << LOG_FLUSH;
+					LOG_INFO << "OPENGL32 graphics api found\nHooking..." << LOG_FLUSH;
 					opengl::HookOpenGL();
 				}
 				if (moduleName == "d3d9.dll") {
-					LOG_INFO << "DIRECTX9" << LOG_FLUSH;
+					LOG_INFO << "DIRECTX9 graphics api found" << LOG_FLUSH;
+					directx9::HookDirectx9();
 				}
 				else if (moduleName == "d3d10.dll") {
-					LOG_INFO << "DIRECTX10" << LOG_FLUSH;
+					LOG_INFO << "DIRECTX10 graphics api found" << LOG_FLUSH;
 				}
 				else if (moduleName == "d3d11.dll") {
-					LOG_INFO << "DIRECTX11" << LOG_FLUSH;
+					LOG_INFO << "DIRECTX11 graphics api found" << LOG_FLUSH;
 				}
 				else if (moduleName == "d3d12.dll") {
-					LOG_INFO << "DIRECTX12" << LOG_FLUSH;
+					LOG_INFO << "DIRECTX12 graphics api found" << LOG_FLUSH;
 				}
 				else if (moduleName == "vulkan-1.dll") {
-					LOG_INFO << "VULKAN" << LOG_FLUSH;
+					LOG_INFO << "VULKAN graphics api found" << LOG_FLUSH;
 				}
 			} while (Module32Next(snapshot, &me));
 		}
