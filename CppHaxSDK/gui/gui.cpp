@@ -28,6 +28,7 @@ namespace haxsdk {
 				}
 				if (moduleName == "d3d9.dll") {
 					LOG_INFO << "DIRECTX9" << LOG_FLUSH;
+					directx9::HookDirectx9();
 				}
 				else if (moduleName == "d3d10.dll") {
 					LOG_INFO << "DIRECTX10 graphics api found" << LOG_FLUSH;
