@@ -166,7 +166,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>detours.lib;Opengl32.lib</AdditionalDependencies>
+      <AdditionalDependencies>detours.lib;Opengl32.lib;D3d9.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x64</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>

@@ -7,55 +7,73 @@
 
 #include <logger.h>
 
-using reset_t = HRESULT(WINAPI*)(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS);
-static reset_t oReset;
-
-static HRESULT WINAPI HookedReset(LPDIRECT3DDEVICE9 device, D3DPRESENT_PARAMETERS params) {
-	ImGui_ImplDX9_InvalidateDeviceObjects();
-	HRESULT result = oReset(device, params);
-	ImGui_ImplDX9_CreateDeviceObjects();
-	return result;
-}
+// global variables
+static bool g_visible = true;
+static unsigned int g_key = 0;
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static WNDPROC oWndproc;
-static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-	if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
-		return true;
+static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	if (g_key > 0 && uMsg == WM_KEYUP && wParam == g_key) {
+		g_visible = !g_visible;
+		ImGui::GetIO().MouseDrawCursor = g_visible;
+	}
 
-	return CallWindowProc(oWndproc, hWnd, msg, wParam, lParam);
+	if (g_visible && ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam)) {
+		return true;
+	}
+
+	return CallWindowProc(oWndproc, hWnd, uMsg, wParam, lParam);
+}
+
+using reset_t = HRESULT(WINAPI*)(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS*);
+static reset_t oReset;
+
+static HRESULT WINAPI HookedReset(LPDIRECT3DDEVICE9 pDevice, D3DPRESENT_PARAMETERS* pPresentationParameters) {
+	ImGui_ImplDX9_InvalidateDeviceObjects();
+	HRESULT result = oReset(pDevice, pPresentationParameters);
+	ImGui_ImplDX9_CreateDeviceObjects();
+	return result;
 }
 
 using endScene_t = HRESULT(WINAPI*)(LPDIRECT3DDEVICE9);
 static endScene_t oEndScene;
 
-static HRESULT WINAPI HookedEndScene(LPDIRECT3DDEVICE9 device) {
+static HRESULT WINAPI HookedEndScene(LPDIRECT3DDEVICE9 pDevice) {
 	static bool inited = false;
 	if (!inited) {
 		LOG_INFO << "Hello from hooked EndScene!" << LOG_FLUSH;
 		inited = true;
 		D3DDEVICE_CREATION_PARAMETERS params;
-		device->GetCreationParameters(&params);
+		pDevice->GetCreationParameters(&params);
 		ImGui::CreateContext();
 		ImGui_ImplWin32_Init(params.hFocusWindow);
-		ImGui_ImplDX9_Init(device);
+		ImGui_ImplDX9_Init(pDevice);
+
+		ImGuiIO& io = ImGui::GetIO();
+		io.MouseDrawCursor = true;
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
 		oWndproc = (WNDPROC)SetWindowLongPtr(params.hFocusWindow, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
 	}
+
 	ImGui_ImplDX9_NewFrame();
 	ImGui_ImplWin32_NewFrame();
-
 	ImGui::NewFrame();
-	ImGui::ShowDemoWindow();
+	if (g_visible) {
+		ImGui::ShowDemoWindow();
+	}
 	ImGui::EndFrame();
 
 	ImGui::Render();
 	ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
 
-	return oEndScene(device);
+	return oEndScene(pDevice);
 }
 
 namespace haxsdk::directx9 {
-	void HookDirectx9(HWND hwnd) {
+	void HookDirectx9(unsigned int key) {
+		g_key = key;
+
 		HMODULE module = ::GetModuleHandle("d3d9.dll");
 		if (module == 0) {
 			LOG_ERROR << "Unable to get d3d9.dll handle" << LOG_FLUSH;
@@ -80,7 +98,7 @@ namespace haxsdk::directx9 {
 			return;
 		}
 
-		void** pVTable = *reinterpret_cast<void***>(dummyDev);
+		void** pVTable = *(void***)(dummyDev);
 		oEndScene = (endScene_t)pVTable[42];
 		oReset = (reset_t)pVTable[16];
 		

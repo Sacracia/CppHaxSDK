@@ -7,7 +7,7 @@
 
 void Start() {
 	LOG_INIT();
-	haxsdk::ImplementGui();
+	haxsdk::ImplementGui(VK_OEM_3);
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {

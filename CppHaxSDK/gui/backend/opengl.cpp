@@ -9,42 +9,59 @@
 #include <backend/imgui_impl_opengl3.h>
 #include <backend/imgui_impl_win32.h>
 
-using swapBuffers_t = bool(WINAPI*)(HDC);
-static swapBuffers_t oSwapBuffers; // original wglSwapBuffers
+// global variables
+static bool g_visible = true;
+static unsigned int g_key = 0;
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-static WNDPROC oWndproc; // original Wndproc
-static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-	if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
-		return true;
+static WNDPROC oWndproc;
+static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	if (g_key > 0 && uMsg == WM_KEYUP && wParam == g_key) {
+		g_visible = !g_visible;
+		ImGui::GetIO().MouseDrawCursor = g_visible;
+	}
 
-	return CallWindowProc(oWndproc, hWnd, msg, wParam, lParam);
+	if (g_visible && ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam)) {
+		return true;
+	}
+
+	return CallWindowProc(oWndproc, hWnd, uMsg, wParam, lParam);
 }
 
+using swapBuffers_t = bool(WINAPI*)(HDC);
+static swapBuffers_t oSwapBuffers;
+
 bool WINAPI HookedSwapBuffers(HDC hdc) {
-	static bool g_inited = false;
-	if (!g_inited) {
+	static bool inited = false;
+	if (!inited) {
 		LOG_INFO << "Hello from hooked wglSwapBuffers!" << LOG_FLUSH;
+		inited = true;
 		HWND hwnd = WindowFromDC(hdc);
 		ImGui::CreateContext();
 		ImGui_ImplWin32_Init(hwnd);
 		ImGui_ImplOpenGL3_Init();
+
+		ImGuiIO& io = ImGui::GetIO();
+		io.MouseDrawCursor = true;
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
 		oWndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
-		g_inited = true;
 	}
 
-	ImGui_ImplOpenGL3_NewFrame();
-	ImGui_ImplWin32_NewFrame();
-	ImGui::NewFrame();
-	ImGui::ShowDemoWindow();
-	ImGui::Render();
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
+		if (g_visible)
+			ImGui::ShowDemoWindow();
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 	return oSwapBuffers(hdc);
 }
 
 namespace haxsdk::opengl {
-	void HookOpenGL() {
+	void HookOpenGL(unsigned int key) {
+		g_key = key;
+
 		HMODULE module = GetModuleHandleA("opengl32.dll");
 		if (module == 0) {
 			LOG_ERROR << "Unable to get opengl32.dll handle" << LOG_FLUSH;

@@ -1,5 +1,5 @@
 #pragma once
 
 namespace haxsdk::opengl {
-	void HookOpenGL();
+	void HookOpenGL(unsigned int key);
 }
