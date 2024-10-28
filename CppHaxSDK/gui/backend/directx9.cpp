@@ -4,8 +4,11 @@
 #include <detours.h>
 #include <backend/imgui_impl_dx9.h>
 #include <backend/imgui_impl_win32.h>
+#include <imgui.h>
+#include <imgui_internal.h>
 
 #include <logger.h>
+#include "user.h"
 
 // global variables
 static bool g_visible = true;
@@ -14,10 +17,12 @@ static unsigned int g_key = 0;
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static WNDPROC oWndproc;
 static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	ImGuiIO& io = ImGui::GetIO();
+	io.MouseDrawCursor = g_visible && io.WantCaptureMouse;
 	if (g_key > 0 && uMsg == WM_KEYUP && wParam == g_key) {
 		g_visible = !g_visible;
-		ImGui::GetIO().MouseDrawCursor = g_visible;
 	}
+	io.MouseDrawCursor = g_visible && io.WantCaptureMouse;
 
 	if (g_visible && ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam)) {
 		return true;
@@ -47,6 +52,7 @@ static HRESULT WINAPI HookedEndScene(LPDIRECT3DDEVICE9 pDevice) {
 		D3DDEVICE_CREATION_PARAMETERS params;
 		pDevice->GetCreationParameters(&params);
 		ImGui::CreateContext();
+		ApplyStyle();
 		ImGui_ImplWin32_Init(params.hFocusWindow);
 		ImGui_ImplDX9_Init(pDevice);
 

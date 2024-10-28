@@ -3,11 +3,13 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include <logger.h>
 #include <detours.h>
 #include <imgui.h>
 #include <backend/imgui_impl_opengl3.h>
 #include <backend/imgui_impl_win32.h>
+
+#include "user.h"
+#include <logger.h>
 
 // global variables
 static bool g_visible = true;
@@ -16,10 +18,12 @@ static unsigned int g_key = 0;
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 static WNDPROC oWndproc;
 static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	ImGuiIO& io = ImGui::GetIO();
+	io.MouseDrawCursor = g_visible && io.WantCaptureMouse;
 	if (g_key > 0 && uMsg == WM_KEYUP && wParam == g_key) {
 		g_visible = !g_visible;
-		ImGui::GetIO().MouseDrawCursor = g_visible;
 	}
+	io.MouseDrawCursor = g_visible && io.WantCaptureMouse;
 
 	if (g_visible && ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam)) {
 		return true;
@@ -38,6 +42,7 @@ bool WINAPI HookedSwapBuffers(HDC hdc) {
 		inited = true;
 		HWND hwnd = WindowFromDC(hdc);
 		ImGui::CreateContext();
+		ApplyStyle();
 		ImGui_ImplWin32_Init(hwnd);
 		ImGui_ImplOpenGL3_Init();
 

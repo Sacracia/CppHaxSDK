@@ -10,6 +10,8 @@
 #include <logger.h>
 #include <backend/opengl.h>
 #include <backend/directx9.h>
+#include <imgui.h>
+#include <imgui_internal.h>
 
 //static BOOL CALLBACK EnumWindowsCallback(HWND handle, LPARAM lParam) {
 //	const auto isMainWindow = [handle]() {
