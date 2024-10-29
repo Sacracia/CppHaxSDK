@@ -150,6 +150,7 @@ static bool WINAPI HookedSwapBuffers(HDC hdc) {
 		inited = true;
 		ImGuiContextParams params = { GraphicsAPI::OpenGL, 0, hdc };
 		InitImGuiContext(params);
+		LOG_INFO << "Hello from hooked wglSwapBuffers" << LOG_FLUSH;
 	}
 
 	ImGui_ImplOpenGL3_NewFrame();
@@ -167,6 +168,7 @@ static HRESULT WINAPI HookedReset(LPDIRECT3DDEVICE9 pDevice, D3DPRESENT_PARAMETE
 	ImGui_ImplDX9_InvalidateDeviceObjects();
 	HRESULT result = oReset(pDevice, pPresentationParameters);
 	ImGui_ImplDX9_CreateDeviceObjects();
+	LOG_INFO << "Hello from hooked Reset" << LOG_FLUSH;
 	return result;
 }
 
@@ -176,6 +178,7 @@ static HRESULT WINAPI HookedEndScene(LPDIRECT3DDEVICE9 pDevice) {
 		inited = true;
 		ImGuiContextParams params = { GraphicsAPI::DirectX9, pDevice, 0 };
 		InitImGuiContext(params);
+		LOG_INFO << "Hello from hooked EndScene" << LOG_FLUSH;
 	}
 
 	ImGui_ImplDX9_NewFrame();
@@ -209,33 +212,26 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 static void InitImGuiContext(ImGuiContextParams params) {
 	static bool inited = false;
 	if (inited) { return; }
+	inited = true;
+
+	HWND hwnd = 0;
 	if (params.api == GraphicsAPI::OpenGL) {
-		HWND hwnd = WindowFromDC(params.hdc);
+		hwnd = WindowFromDC(params.hdc);
 		ImGui::CreateContext();
 		ImGui_ImplWin32_Init(hwnd);
 		ImGui_ImplOpenGL3_Init();
-
-		ImGuiIO& io = ImGui::GetIO();
-		io.MouseDrawCursor = true;
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
-		oWndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
-
-		LOG_INFO << "Hello from wglSwapBuffers" << LOG_FLUSH;
 	}
 	if (params.api == GraphicsAPI::DirectX9) {
 		D3DDEVICE_CREATION_PARAMETERS creationParams;
 		params.pDevice->GetCreationParameters(&creationParams);
+		hwnd = creationParams.hFocusWindow;
 		ImGui::CreateContext();
-		ImGui_ImplWin32_Init(creationParams.hFocusWindow);
+		ImGui_ImplWin32_Init(hwnd);
 		ImGui_ImplDX9_Init(params.pDevice);
-
-		ImGuiIO& io = ImGui::GetIO();
-		io.MouseDrawCursor = true;
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
-		oWndproc = (WNDPROC)SetWindowLongPtr(creationParams.hFocusWindow, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
-
-		LOG_INFO << "Hello from endScene" << LOG_FLUSH;
 	}
 
-	inited = true;
+	ImGuiIO& io = ImGui::GetIO();
+	io.MouseDrawCursor = true;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
+	oWndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
 }
