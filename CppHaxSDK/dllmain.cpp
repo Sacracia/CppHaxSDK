@@ -2,12 +2,12 @@
 #include <windows.h>
 #include <iostream>
 
-#include <logger.h>
-#include <gui.h>
+#include "logger/logger.h"
+#include "gui.h"
 
 void Start() {
 	LOG_INIT();
-	haxsdk::ImplementGui(VK_OEM_3);
+	haxsdk::ImplementImGui();
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {
