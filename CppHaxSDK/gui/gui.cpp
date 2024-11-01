@@ -95,6 +95,7 @@ void haxsdk::ImplementImGui() {
 			}
 			else if (moduleName == "d3d10.dll") {
 				LOG_INFO << "DIRECTX10 graphics api found" << LOG_FLUSH;
+				HookDirectX10();
 			}
 			else if (moduleName == "d3d11.dll") {
 				LOG_INFO << "DIRECTX11 graphics api found" << LOG_FLUSH;
@@ -192,6 +193,9 @@ static void HookDirectX10() {
 	oPresent10 = (present_t)pVTable[8];
 	oResizeBuffers = (resizeBuffers_t)pVTable[13];
 
+	LOG_INFO << "IDXGISwapChain::Present " << oPresent10 << LOG_FLUSH;
+	LOG_INFO << "IDXGISwapChain::ResizeBuffers " << oResizeBuffers << LOG_FLUSH;
+
 	pSwapChain->Release();
 
 	DetourTransactionBegin();
@@ -265,18 +269,24 @@ static HRESULT WINAPI HookedPresent10(IDXGISwapChain* pSwapChain, UINT syncInter
 	ImGui_ImplDX10_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
-	ImGui::ShowDemoWindow();
+	if (g_visible) {
+		ImGui::ShowDemoWindow();
+	}
 	ImGui::EndFrame();
 	ImGui::Render();
 	g_pDevice->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
 	ImGui_ImplDX10_RenderDrawData(ImGui::GetDrawData());
+
+	return oPresent10(pSwapChain, syncInterval, flags);
 }
 
 static HRESULT WINAPI HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags) {
-if (g_mainRenderTargetView) {
+	if (g_mainRenderTargetView) {
 		g_mainRenderTargetView->Release();
+		g_mainRenderTargetView = nullptr;
 	}
-	CreateRenderTarget(pSwapChain);
+	LOG_INFO << "Hello from hooked ResizeBuffers" << LOG_FLUSH;
+	return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
 }
 
 static void CreateRenderTarget(IDXGISwapChain* pSwapChain) {
