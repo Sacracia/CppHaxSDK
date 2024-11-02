@@ -41,11 +41,13 @@
 #include "../third_party/imgui/backend/imgui_impl_win32.h"
 #include "../third_party/imgui/backend/imgui_impl_opengl3.h"
 
-using swapBuffers_t		= bool(WINAPI*)(HDC);
-using reset_t			= HRESULT(WINAPI*)(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS*);
-using endScene_t		= HRESULT(WINAPI*)(LPDIRECT3DDEVICE9);
-using present_t			= HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT);
-using resizeBuffers_t	= HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT, UINT, DXGI_FORMAT, UINT);
+using swapBuffers_t			= bool(WINAPI*)(HDC);
+using reset_t				= HRESULT(WINAPI*)(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS*);
+using endScene_t			= HRESULT(WINAPI*)(LPDIRECT3DDEVICE9);
+using present_t				= HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT);
+using resizeBuffers_t		= HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT, UINT, DXGI_FORMAT, UINT);
+using setRenderTargets_t	= void(WINAPI*)(ID3D10Device*, UINT, ID3D10RenderTargetView* const*, ID3D10DepthStencilView*);
+using setRenderTargets11_t	= void(WINAPI*)(ID3D11DeviceContext*, UINT, ID3D11RenderTargetView* const*, ID3D11DepthStencilView*);
 
 static bool						g_visible = true;
 static bool						g_d3dlock;
@@ -56,11 +58,13 @@ static endScene_t				oEndScene;
 // directx 10
 static present_t				oD3D10Present;
 static resizeBuffers_t			oD3D10ResizeBuffers;
+static setRenderTargets_t		oD3D10OMSetRenderTargets;
 static ID3D10RenderTargetView*	g_pD3D10RenderTarget;
 static ID3D10Device*			g_pD3D10Device;
 // directx 11
 static present_t				oD3D11Present;
 static resizeBuffers_t			oD3D11ResizeBuffers;
+static setRenderTargets11_t		oD3D11OMSetRenderTargets;
 static ID3D11RenderTargetView*	g_pD3D11RenderTarget;
 static ID3D11Device*			g_pD3D11Device;
 static ID3D11DeviceContext*		g_pD3D11DeviceContext;
@@ -91,11 +95,13 @@ static void				D3D10_Hook();
 static HRESULT WINAPI	D3D10_HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
 static HRESULT WINAPI	D3D10_HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags);
 static void				D3D10_CreateRenderTarget(IDXGISwapChain* pSwapChain);
+static void				D3D10_HookedOMSetRenderTargets(ID3D10Device*, UINT, ID3D10RenderTargetView* const*, ID3D10DepthStencilView*);
 // directx 11
 static void				D3D11_Hook();
 static HRESULT WINAPI	D3D11_HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
 static HRESULT WINAPI	D3D11_HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags);
 static void				D3D11_CreateRenderTarget(IDXGISwapChain* pSwapChain);
+static void				D3D11_HookedOMSetRenderTargets(ID3D11DeviceContext*, UINT, ID3D11RenderTargetView* const*, ID3D11DepthStencilView*);
 
 void haxsdk::ImplementImGui() {
 	DWORD processId = GetProcessId(GetCurrentProcess());
@@ -109,11 +115,11 @@ void haxsdk::ImplementImGui() {
 			std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
 			if (moduleName == "opengl32.dll") {
 				LOG_INFO << "OPENGL32 graphics api found" << LOG_FLUSH;
-				OpenGL_Hook();
+				//OpenGL_Hook();
 			}
 			if (moduleName == "d3d9.dll") {
 				LOG_INFO << "DIRECTX9 graphics api found" << LOG_FLUSH;
-				D3D9_Hook();
+				//D3D9_Hook();
 			}
 			else if (moduleName == "d3d10.dll") {
 				LOG_INFO << "DIRECTX10 graphics api found" << LOG_FLUSH;
@@ -121,7 +127,7 @@ void haxsdk::ImplementImGui() {
 			}
 			else if (moduleName == "d3d11.dll") {
 				LOG_INFO << "DIRECTX11 graphics api found" << LOG_FLUSH;
-				//D3D11_Hook();
+				D3D11_Hook();
 			}
 			else if (moduleName == "d3d12.dll") {
 				LOG_INFO << "DIRECTX12 graphics api found" << LOG_FLUSH;
@@ -321,6 +327,7 @@ static void D3D10_Hook() {
 	swapChainDesc.SampleDesc.Count = 1;
 
 	IDXGISwapChain* pSwapChain;
+	//ID3D10Device* pDevice;
 	HRESULT result = D3D10CreateDeviceAndSwapChain(NULL, D3D10_DRIVER_TYPE_NULL, NULL, 0, D3D10_SDK_VERSION, &swapChainDesc, &pSwapChain, &g_pD3D10Device);
 	if (result != S_OK) {
 		LOG_ERROR << "[D3D10] D3D10CreateDeviceAndSwapChain returned " << result << ". Hook not installed" << LOG_FLUSH;
@@ -330,15 +337,21 @@ static void D3D10_Hook() {
 	void** pVTable = *reinterpret_cast<void***>(pSwapChain);
 	oD3D10Present = (present_t)pVTable[8];
 	oD3D10ResizeBuffers = (resizeBuffers_t)pVTable[13];
+	pVTable = *reinterpret_cast<void***>(g_pD3D10Device);
+	oD3D10OMSetRenderTargets = (setRenderTargets_t)(pVTable[24]);
 
+	LOG_INFO << "[D3D10] VTable " << pVTable << LOG_FLUSH;
 	LOG_INFO << "[D3D10] IDXGISwapChain::Present address is " << oD3D10Present << LOG_FLUSH;
 	LOG_INFO << "[D3D10] IDXGISwapChain::ResizeBuffers address is " << oD3D10ResizeBuffers << LOG_FLUSH;
+	LOG_INFO << "[D3D10] ID3D10Device::OMSetRenderTargets address is " << oD3D10OMSetRenderTargets << LOG_FLUSH;
 
 	pSwapChain->Release();
+	//g_pD3D10Device->Release();
 
 	DetourTransactionBegin();
-	DetourAttach(&(PVOID&)oD3D10Present, D3D10_HookedPresent);
-	DetourAttach(&(PVOID&)oD3D10ResizeBuffers, D3D10_HookedResizeBuffers);
+	//DetourAttach(&(PVOID&)oD3D10Present, D3D10_HookedPresent);
+	//DetourAttach(&(PVOID&)oD3D10ResizeBuffers, D3D10_HookedResizeBuffers);
+	DetourAttach(&(PVOID&)oD3D10OMSetRenderTargets, D3D10_HookedOMSetRenderTargets);
 	DetourTransactionCommit();
 }
 
@@ -388,6 +401,16 @@ static void D3D10_CreateRenderTarget(IDXGISwapChain* pSwapChain) {
 	}
 }
 
+static void	D3D10_HookedOMSetRenderTargets(ID3D10Device* pDevice, UINT numViews, ID3D10RenderTargetView* const* ppRenderTargetViews,
+										   ID3D10DepthStencilView* pDepthStencilView) {
+	static bool inited = false;
+	if (!inited) {
+		inited = true;
+		LOG_INFO << "GAME USES DIRECTX10" << LOG_FLUSH;
+	}
+	oD3D10OMSetRenderTargets(pDevice, numViews, ppRenderTargetViews, pDepthStencilView);
+}
+
 //-----------------------------------------------------------------------------
 // [SECTION] DIRECT X 11
 //-----------------------------------------------------------------------------
@@ -408,8 +431,8 @@ static void	D3D11_Hook() {
 		D3D_FEATURE_LEVEL_10_0,
 	};
 	IDXGISwapChain* pSwapChain;
-	ID3D11Device* pDevice;
-	HRESULT result = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_NULL, NULL, 0, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &pSwapChain, &pDevice, nullptr, nullptr);
+	//ID3D11Device* pDevice;
+	HRESULT result = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_NULL, NULL, 0, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &pSwapChain, &g_pD3D11Device, nullptr, &g_pD3D11DeviceContext);
 	if (result != S_OK) {
 		LOG_ERROR << "[D3D11] D3D11CreateDeviceAndSwapChain returned " << result << ". Hook not installed" << LOG_FLUSH;
 		return;
@@ -418,16 +441,20 @@ static void	D3D11_Hook() {
 	void** pVTable = *(void***)(pSwapChain);
 	oD3D11Present = (present_t)pVTable[8];
 	oD3D11ResizeBuffers = (resizeBuffers_t)pVTable[13];
+	pVTable = *(void***)(g_pD3D11DeviceContext);
+	oD3D11OMSetRenderTargets = (setRenderTargets11_t)pVTable[33];
 
 	pSwapChain->Release();
-	pDevice->Release();
+	//pDevice->Release();
 
+	LOG_INFO << "[D3D11] ID3D11DeviceContext::OMSetRenderTargets address is " << oD3D11OMSetRenderTargets << LOG_FLUSH;
 	LOG_INFO << "[D3D11] IDXGISwapChain::Present address is " << oD3D11Present << LOG_FLUSH;
 	LOG_INFO << "[D3D11] IDXGISwapChain::ResizeBuffers address is " << oD3D11ResizeBuffers << LOG_FLUSH;
 
 	DetourTransactionBegin();
-	DetourAttach(&(PVOID&)oD3D11Present, D3D11_HookedPresent);
-	DetourAttach(&(PVOID&)oD3D11ResizeBuffers, D3D11_HookedResizeBuffers);
+	//DetourAttach(&(PVOID&)oD3D11Present, D3D11_HookedPresent);
+	//DetourAttach(&(PVOID&)oD3D11ResizeBuffers, D3D11_HookedResizeBuffers);
+	DetourAttach(&(PVOID&)oD3D11OMSetRenderTargets, D3D11_HookedOMSetRenderTargets);
 	DetourTransactionCommit();
 }
 
@@ -475,4 +502,14 @@ static void	D3D11_CreateRenderTarget(IDXGISwapChain* pSwapChain) {
 		g_pD3D11Device->CreateRenderTargetView(pBackBuffer, nullptr, &g_pD3D11RenderTarget);
 		pBackBuffer->Release();
 	}
+}
+
+static void	D3D11_HookedOMSetRenderTargets(ID3D11DeviceContext* pDevice, UINT numViews, ID3D11RenderTargetView* const* ppRenderTargetViews,
+										   ID3D11DepthStencilView* pDepthStencilView) {
+	static bool inited = false;
+	if (!inited) {
+		inited = true;
+		LOG_INFO << "GAME USES DIRECTX11" << LOG_FLUSH;
+	}
+	oD3D11OMSetRenderTargets(pDevice, numViews, ppRenderTargetViews, pDepthStencilView);
 }
