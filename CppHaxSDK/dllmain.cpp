@@ -6,7 +6,7 @@
 #include "gui.h"
 
 void Start() {
-	LOG_INIT();
+	LOG_INIT(WARNING);
 	haxsdk::ImplementImGui();
 }
 

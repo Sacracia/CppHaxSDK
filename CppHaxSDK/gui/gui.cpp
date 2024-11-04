@@ -115,24 +115,24 @@ void haxsdk::ImplementImGui() {
 			std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
 			if (moduleName == "opengl32.dll") {
 				LOG_INFO << "OPENGL32 graphics api found" << LOG_FLUSH;
-				//OpenGL_Hook();
+				OpenGL_Hook();
 			}
 			if (moduleName == "d3d9.dll") {
 				LOG_INFO << "DIRECTX9 graphics api found" << LOG_FLUSH;
-				//D3D9_Hook();
+				D3D9_Hook();
 			}
-			else if (moduleName == "d3d10.dll") {
-				LOG_INFO << "DIRECTX10 graphics api found" << LOG_FLUSH;
-				D3D10_Hook();
-			}
-			else if (moduleName == "d3d11.dll") {
+			if (moduleName == "d3d11.dll") {
 				LOG_INFO << "DIRECTX11 graphics api found" << LOG_FLUSH;
 				D3D11_Hook();
 			}
-			else if (moduleName == "d3d12.dll") {
+			/*else if (moduleName == "d3d10.dll") {
+				LOG_INFO << "DIRECTX10 graphics api found" << LOG_FLUSH;
+				D3D10_Hook();
+			}*/
+			if (moduleName == "d3d12.dll") {
 				LOG_INFO << "DIRECTX12 graphics api found" << LOG_FLUSH;
 			}
-			else if (moduleName == "vulkan-1.dll") {
+			if (moduleName == "vulkan-1.dll") {
 				LOG_INFO << "VULKAN graphics api found" << LOG_FLUSH;
 			}
 		} while (Module32Next(snapshot, &me));
@@ -184,7 +184,7 @@ static void InitImGuiContext(ImGuiContextParams params) {
 		ImGui_ImplWin32_Init(hwnd);
 		ImGui_ImplDX10_Init(g_pD3D10Device);
 	}
-	else {
+	if (params.api == GraphicsAPI::D3D11) {
 		DXGI_SWAP_CHAIN_DESC swapChainDesc;
 		params.pSwapChain->GetDevice(IID_PPV_ARGS(&g_pD3D11Device));
 		params.pSwapChain->GetDesc(&swapChainDesc);
@@ -225,7 +225,7 @@ static bool WINAPI OpenGL_HookedSwapBuffers(HDC hdc) {
 		inited = true;
 		ImGuiContextParams params = { GraphicsAPI::OpenGL, nullptr, hdc, nullptr };
 		InitImGuiContext(params);
-		LOG_INFO << "[OPENGL] Drawing inited" << LOG_FLUSH;
+		LOG_WARNING << "GAME USES OPENGL" << LOG_FLUSH;
 	}
 
 	ImGui_ImplOpenGL3_NewFrame();
@@ -286,7 +286,7 @@ static HRESULT WINAPI D3D9_HookedEndScene(LPDIRECT3DDEVICE9 pDevice) {
 		inited = true;
 		ImGuiContextParams params = { GraphicsAPI::D3D9, pDevice, 0, nullptr };
 		InitImGuiContext(params);
-		LOG_INFO << "[D3D9] Drawing inited" << LOG_FLUSH;
+		LOG_WARNING << "GAME USES DIRECTX9" << LOG_FLUSH;
 	}
 
 	ImGui_ImplDX9_NewFrame();
@@ -327,8 +327,8 @@ static void D3D10_Hook() {
 	swapChainDesc.SampleDesc.Count = 1;
 
 	IDXGISwapChain* pSwapChain;
-	//ID3D10Device* pDevice;
-	HRESULT result = D3D10CreateDeviceAndSwapChain(NULL, D3D10_DRIVER_TYPE_NULL, NULL, 0, D3D10_SDK_VERSION, &swapChainDesc, &pSwapChain, &g_pD3D10Device);
+	ID3D10Device* pDevice;
+	HRESULT result = D3D10CreateDeviceAndSwapChain(NULL, D3D10_DRIVER_TYPE_NULL, NULL, 0, D3D10_SDK_VERSION, &swapChainDesc, &pSwapChain, &pDevice);
 	if (result != S_OK) {
 		LOG_ERROR << "[D3D10] D3D10CreateDeviceAndSwapChain returned " << result << ". Hook not installed" << LOG_FLUSH;
 		return;
@@ -337,21 +337,20 @@ static void D3D10_Hook() {
 	void** pVTable = *reinterpret_cast<void***>(pSwapChain);
 	oD3D10Present = (present_t)pVTable[8];
 	oD3D10ResizeBuffers = (resizeBuffers_t)pVTable[13];
-	pVTable = *reinterpret_cast<void***>(g_pD3D10Device);
+	pVTable = *reinterpret_cast<void***>(pDevice);
 	oD3D10OMSetRenderTargets = (setRenderTargets_t)(pVTable[24]);
 
-	LOG_INFO << "[D3D10] VTable " << pVTable << LOG_FLUSH;
 	LOG_INFO << "[D3D10] IDXGISwapChain::Present address is " << oD3D10Present << LOG_FLUSH;
 	LOG_INFO << "[D3D10] IDXGISwapChain::ResizeBuffers address is " << oD3D10ResizeBuffers << LOG_FLUSH;
 	LOG_INFO << "[D3D10] ID3D10Device::OMSetRenderTargets address is " << oD3D10OMSetRenderTargets << LOG_FLUSH;
 
 	pSwapChain->Release();
-	//g_pD3D10Device->Release();
+	pDevice->Release();
 
 	DetourTransactionBegin();
-	//DetourAttach(&(PVOID&)oD3D10Present, D3D10_HookedPresent);
-	//DetourAttach(&(PVOID&)oD3D10ResizeBuffers, D3D10_HookedResizeBuffers);
-	DetourAttach(&(PVOID&)oD3D10OMSetRenderTargets, D3D10_HookedOMSetRenderTargets);
+	DetourAttach(&(PVOID&)oD3D10Present, D3D10_HookedPresent);
+	DetourAttach(&(PVOID&)oD3D10ResizeBuffers, D3D10_HookedResizeBuffers);
+	//DetourAttach(&(PVOID&)oD3D10OMSetRenderTargets, D3D10_HookedOMSetRenderTargets);
 	DetourTransactionCommit();
 }
 
@@ -406,7 +405,7 @@ static void	D3D10_HookedOMSetRenderTargets(ID3D10Device* pDevice, UINT numViews,
 	static bool inited = false;
 	if (!inited) {
 		inited = true;
-		LOG_INFO << "GAME USES DIRECTX10" << LOG_FLUSH;
+		LOG_WARNING << "GAME USES DIRECTX10" << LOG_FLUSH;
 	}
 	oD3D10OMSetRenderTargets(pDevice, numViews, ppRenderTargetViews, pDepthStencilView);
 }
@@ -431,8 +430,8 @@ static void	D3D11_Hook() {
 		D3D_FEATURE_LEVEL_10_0,
 	};
 	IDXGISwapChain* pSwapChain;
-	//ID3D11Device* pDevice;
-	HRESULT result = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_NULL, NULL, 0, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &pSwapChain, &g_pD3D11Device, nullptr, &g_pD3D11DeviceContext);
+	ID3D11Device* pDevice;
+	HRESULT result = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_NULL, NULL, 0, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &pSwapChain, &pDevice, nullptr, &g_pD3D11DeviceContext);
 	if (result != S_OK) {
 		LOG_ERROR << "[D3D11] D3D11CreateDeviceAndSwapChain returned " << result << ". Hook not installed" << LOG_FLUSH;
 		return;
@@ -445,15 +444,13 @@ static void	D3D11_Hook() {
 	oD3D11OMSetRenderTargets = (setRenderTargets11_t)pVTable[33];
 
 	pSwapChain->Release();
-	//pDevice->Release();
+	pDevice->Release();
 
 	LOG_INFO << "[D3D11] ID3D11DeviceContext::OMSetRenderTargets address is " << oD3D11OMSetRenderTargets << LOG_FLUSH;
 	LOG_INFO << "[D3D11] IDXGISwapChain::Present address is " << oD3D11Present << LOG_FLUSH;
 	LOG_INFO << "[D3D11] IDXGISwapChain::ResizeBuffers address is " << oD3D11ResizeBuffers << LOG_FLUSH;
 
 	DetourTransactionBegin();
-	//DetourAttach(&(PVOID&)oD3D11Present, D3D11_HookedPresent);
-	//DetourAttach(&(PVOID&)oD3D11ResizeBuffers, D3D11_HookedResizeBuffers);
 	DetourAttach(&(PVOID&)oD3D11OMSetRenderTargets, D3D11_HookedOMSetRenderTargets);
 	DetourTransactionCommit();
 }
@@ -509,7 +506,11 @@ static void	D3D11_HookedOMSetRenderTargets(ID3D11DeviceContext* pDevice, UINT nu
 	static bool inited = false;
 	if (!inited) {
 		inited = true;
-		LOG_INFO << "GAME USES DIRECTX11" << LOG_FLUSH;
+		LOG_WARNING << "GAME USES DIRECTX11" << LOG_FLUSH;
+		DetourTransactionBegin();
+		DetourAttach(&(PVOID&)oD3D11Present, D3D11_HookedPresent);
+		DetourAttach(&(PVOID&)oD3D11ResizeBuffers, D3D11_HookedResizeBuffers);
+		DetourTransactionCommit();
 	}
 	oD3D11OMSetRenderTargets(pDevice, numViews, ppRenderTargetViews, pDepthStencilView);
 }

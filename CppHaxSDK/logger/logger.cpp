@@ -16,49 +16,52 @@ namespace haxsdk {
 
 	Logger& Logger::LogWarning()
 	{
+		m_curLogLevel = LogLevel::WARNING;
 		LogHeader("WARNING");
 		return *this;
 	}
 
 	Logger& Logger::LogInfo()
 	{
+		m_curLogLevel = LogLevel::INFO;
 		LogHeader("INFO");
 		return *this;
 	}
 
 	Logger& Logger::LogError()
 	{
+		m_curLogLevel = LogLevel::ERRO;
 		LogHeader("ERROR");
 		return *this;
 	}
 
-	void Logger::LogHeader(std::string_view level) {
-		if (!IsEmpty()) {
-			Flush(); 
-		}
+	inline void Logger::LogHeader(std::string_view level) {
+		Flush(); 
 		auto t = std::time(nullptr);
 		m_ss << std::put_time(std::localtime(&t), "%d-%m-%Y %H:%M:%S") << 
 			" [" << std::left << std::setw(7) << level << "] ";
 	}
 
 	void Logger::Flush() {
-		if (!IsEmpty()) {
+		if (IsEmpty()) {
+			return;
+		}
+		if (m_curLogLevel >= m_level) {
 			m_ss << '\n';
 			std::cout << m_ss.str();
 
 			std::ofstream file(m_filePath, std::ios::app);
 			file << m_ss.str();
 			file.close();
-
-			m_ss.str("");
 		}
+		m_ss.str("");
 	}
 
 	bool Logger::IsEmpty() {
 		return m_ss.tellp() == std::streampos(0);
 	}
 
-	void Logger::Init() {
+	void Logger::Init(LogLevel level) {
 		AllocConsole();
 		freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
 
@@ -75,5 +78,6 @@ namespace haxsdk {
 		std::filesystem::remove(logPath, errCode);
 
 		m_filePath = logPath;
+		m_level = level;
 	}
 }
