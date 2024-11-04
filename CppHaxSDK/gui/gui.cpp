@@ -41,6 +41,8 @@
 #include "../third_party/imgui/backend/imgui_impl_win32.h"
 #include "../third_party/imgui/backend/imgui_impl_opengl3.h"
 
+using setCursorPos_t		= BOOL(WINAPI*)(int, int);
+using clipCursor_t			= BOOL(WINAPI*)(const RECT*);
 using swapBuffers_t			= bool(WINAPI*)(HDC);
 using reset_t				= HRESULT(WINAPI*)(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS*);
 using endScene_t			= HRESULT(WINAPI*)(LPDIRECT3DDEVICE9);
@@ -52,6 +54,8 @@ using setRenderTargets11_t	= void(WINAPI*)(ID3D11DeviceContext*, UINT, ID3D11Ren
 static bool						g_visible = true;
 static bool						g_d3dlock;
 static WNDPROC					oWndproc;
+static setCursorPos_t			oSetCursorPos;
+static clipCursor_t				oClipCursor;
 static swapBuffers_t			oSwapBuffers;
 static reset_t					oReset;
 static endScene_t				oEndScene;
@@ -82,6 +86,8 @@ struct ImGuiContextParams
 };
 
 static LRESULT WINAPI	HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+static BOOL WINAPI		HookedSetCursorPos(int X, int Y);
+static BOOL WINAPI		HookedClipCursor(const RECT* lpRect);
 static void				InitImGuiContext(ImGuiContextParams params);
 // opengl
 static void				OpenGL_Hook();
@@ -125,7 +131,7 @@ void haxsdk::ImplementImGui() {
 				LOG_INFO << "DIRECTX11 graphics api found" << LOG_FLUSH;
 				D3D11_Hook();
 			}
-			/*else if (moduleName == "d3d10.dll") {
+			/*if (moduleName == "d3d10.dll") {
 				LOG_INFO << "DIRECTX10 graphics api found" << LOG_FLUSH;
 				D3D10_Hook();
 			}*/
@@ -143,16 +149,66 @@ void haxsdk::ImplementImGui() {
 
 static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 	ImGuiIO& io = ImGui::GetIO();
-	if (uMsg == WM_KEYUP && wParam == VK_OEM_3) {
-		g_visible = !g_visible;
-	}
-	io.MouseDrawCursor = g_visible && io.WantCaptureMouse;
+	POINT position;
+	GetCursorPos(&position);
+	ScreenToClient(hWnd, &position);
+	io.MousePos.x = (float)position.x;
+	io.MousePos.y = (float)position.y;
 
-	if (g_visible && ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam)) {
-		return true;
+
+	if (uMsg == WM_KEYUP && wParam == VK_OEM_3) { 
+		g_visible = !g_visible; 
 	}
 
+	if (g_visible) {
+		RECT rect;
+		GetWindowRect(hWnd, &rect);
+		HookedClipCursor(&rect);
+
+		io.MouseDrawCursor = true;
+
+		ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam);
+		switch (uMsg) {
+		case WM_MOUSEMOVE:
+		case WM_MOUSEACTIVATE:
+		case WM_MOUSEHOVER:
+		case WM_NCMOUSEMOVE:
+		case WM_LBUTTONDOWN:
+		case WM_RBUTTONDOWN:
+		case WM_MBUTTONDOWN:
+		case WM_LBUTTONUP:
+		case WM_RBUTTONUP:
+		case WM_MBUTTONUP:
+		case WM_LBUTTONDBLCLK:
+		case WM_RBUTTONDBLCLK:
+		case WM_MBUTTONDBLCLK:
+		case WM_MOUSEWHEEL:
+		case WM_MOUSEHWHEEL:
+		case WM_INPUT:
+		case WM_TOUCH:
+		case WM_POINTERDOWN:
+		case WM_POINTERUP:
+		case WM_POINTERUPDATE:
+		case WM_NCMOUSELEAVE:
+		case WM_MOUSELEAVE:
+		case WM_SETCURSOR:
+		case WM_SIZE:
+		case WM_MOVE:
+		case WM_KEYDOWN:
+		case WM_KEYUP:
+			return true;
+		}
+	}
+	io.MouseDrawCursor = false;
 	return CallWindowProc(oWndproc, hWnd, uMsg, wParam, lParam);
+}
+
+static BOOL WINAPI HookedSetCursorPos(int X, int Y) {
+	return g_visible ? true : oSetCursorPos(X, Y);
+}
+
+static BOOL WINAPI HookedClipCursor(const RECT* lpRect) {
+	return oClipCursor(g_visible ? NULL : lpRect);
 }
 
 static void InitImGuiContext(ImGuiContextParams params) {
@@ -196,9 +252,17 @@ static void InitImGuiContext(ImGuiContextParams params) {
 	}
 
 	ImGuiIO& io = ImGui::GetIO();
-	io.MouseDrawCursor = true;
+	io.WantCaptureMouse = true;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
 	oWndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
+
+	oClipCursor = (clipCursor_t)GetProcAddress(GetModuleHandleA("user32.dll"), "ClipCursor");
+	LOG_INFO << oClipCursor << LOG_FLUSH;
+	if (oClipCursor) {
+		DetourTransactionBegin();
+		DetourAttach(&(PVOID&)oClipCursor, HookedClipCursor);
+		DetourTransactionCommit();
+	}
 }
 
 //-----------------------------------------------------------------------------
@@ -427,7 +491,7 @@ static void	D3D11_Hook() {
 
 	const D3D_FEATURE_LEVEL featureLevels[] = {
 		D3D_FEATURE_LEVEL_11_0,
-		D3D_FEATURE_LEVEL_10_0,
+		D3D_FEATURE_LEVEL_10_0
 	};
 	IDXGISwapChain* pSwapChain;
 	ID3D11Device* pDevice;
