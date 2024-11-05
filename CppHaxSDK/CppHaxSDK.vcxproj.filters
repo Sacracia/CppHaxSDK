@@ -72,19 +72,16 @@
     <ClInclude Include="gui\gui.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="gui\backend\opengl.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl3.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl3_loader.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="gui\backend\directx9.h">
+    <ClInclude Include="gui\directx12.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="gui\user.h">
+    <ClInclude Include="third_party\imgui\backend\imgui_impl_dx12.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -128,16 +125,13 @@
     <ClCompile Include="gui\gui.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="gui\backend\opengl.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
     <ClCompile Include="third_party\imgui\backend\imgui_impl_opengl3.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="gui\backend\directx9.cpp">
+    <ClCompile Include="gui\directx12.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="gui\user.cpp">
+    <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

@@ -175,6 +175,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="gui\directx12.h" />
     <ClInclude Include="gui\gui.h" />
     <ClInclude Include="logger\logger.h" />
     <ClInclude Include="third_party\detours\x64\detours.h" />
@@ -185,6 +186,7 @@
     <ClInclude Include="third_party\detours\x86\syelog.h" />
     <ClInclude Include="third_party\imgui\backend\imgui_impl_dx10.h" />
     <ClInclude Include="third_party\imgui\backend\imgui_impl_dx11.h" />
+    <ClInclude Include="third_party\imgui\backend\imgui_impl_dx12.h" />
     <ClInclude Include="third_party\imgui\backend\imgui_impl_dx9.h" />
     <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl2.h" />
     <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl3.h" />
@@ -199,10 +201,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="gui\directx12.cpp" />
     <ClCompile Include="gui\gui.cpp" />
     <ClCompile Include="logger\logger.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
+    <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx9.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_opengl2.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_opengl3.cpp" />
