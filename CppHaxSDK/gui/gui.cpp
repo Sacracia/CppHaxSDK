@@ -199,6 +199,7 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 
 		ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam);
 		switch (uMsg) {
+		case WM_KEYUP: if (wParam != VK_OEM_3) break;
 		case WM_MOUSEMOVE:
 		case WM_MOUSEACTIVATE:
 		case WM_MOUSEHOVER:
@@ -224,8 +225,6 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 		case WM_SETCURSOR:
 		case WM_SIZE:
 		case WM_MOVE:
-		case WM_KEYDOWN:
-		case WM_KEYUP:
 			return true;
 		}
 	}
@@ -283,15 +282,18 @@ static void InitImGuiContext(ImGuiContextParams params) {
 	if (params.api == GraphicsAPI::D3D12) {
 		DXGI_SWAP_CHAIN_DESC swapChainDesc;
 		params.pSwapChain->GetDesc(&swapChainDesc);
-		HWND hwnd = swapChainDesc.OutputWindow;
+		hwnd = swapChainDesc.OutputWindow;
 		ImGui::CreateContext();
 		ImGui_ImplWin32_Init(hwnd);
+		LOG_INFO << "WIN32INIT" << LOG_FLUSH;
 	}
 
+	LOG_INFO << "hwnd " << hwnd << LOG_FLUSH;
 	ImGuiIO& io = ImGui::GetIO();
 	io.WantCaptureMouse = true;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
 	oWndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
+	LOG_INFO << oWndproc << LOG_FLUSH;
 
 	oClipCursor = (clipCursor_t)GetProcAddress(GetModuleHandleA("user32.dll"), "ClipCursor");
 	DetourTransactionBegin();
@@ -706,13 +708,11 @@ namespace dx12 {
 	}
 
 	static HRESULT WINAPI HookedPresent(IDXGISwapChain3* pSwapChain, UINT SyncInterval, UINT Flags) {
-		static bool inited = false;
-		if (!inited) {
+		if (!ImGui::GetIO().BackendPlatformUserData) {
 			ImGuiContextParams params;
 			params.api = GraphicsAPI::D3D12;
 			params.pSwapChain = pSwapChain;
 			InitImGuiContext(params);
-			inited = true;
 		}
 
 		if (!ImGui::GetIO().BackendRendererUserData) {
@@ -755,6 +755,7 @@ namespace dx12 {
 					DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeap,
 					g_pd3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
 					g_pd3dSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
+				LOG_INFO << "IMPLDX12" << LOG_FLUSH;
 			}
 		}
 
@@ -767,7 +768,9 @@ namespace dx12 {
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();
 
-			ImGui::ShowDemoWindow();
+			if (g_visible) {
+				ImGui::ShowDemoWindow();
+			}
 
 			ImGui::Render();
 

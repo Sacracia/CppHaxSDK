@@ -78,9 +78,6 @@
     <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl3_loader.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="gui\directx12.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="third_party\imgui\backend\imgui_impl_dx12.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
@@ -126,9 +123,6 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="third_party\imgui\backend\imgui_impl_opengl3.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="gui\directx12.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp">
