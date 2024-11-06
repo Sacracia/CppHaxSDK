@@ -53,6 +53,7 @@ using resizeBuffers_t		= HRESULT(WINAPI*)(IDXGISwapChain*, UINT, UINT, UINT, DXG
 using setRenderTargets_t	= void(WINAPI*)(ID3D10Device*, UINT, ID3D10RenderTargetView* const*, ID3D10DepthStencilView*);
 using setRenderTargets11_t	= void(WINAPI*)(ID3D11DeviceContext*, UINT, ID3D11RenderTargetView* const*, ID3D11DepthStencilView*);
 using executeCommandLists_t = void(WINAPI*)(ID3D12CommandQueue*, UINT, ID3D12CommandList*);
+using setRenderTargets12_t	= void(WINAPI*)(ID3D12GraphicsCommandList*, UINT, const D3D12_CPU_DESCRIPTOR_HANDLE*, BOOL, const D3D12_CPU_DESCRIPTOR_HANDLE*);
 
 static bool						g_visible = true;
 static bool						g_d3dlock;
@@ -68,13 +69,15 @@ static resizeBuffers_t			oD3D10ResizeBuffers;
 static setRenderTargets_t		oD3D10OMSetRenderTargets;
 static ID3D10RenderTargetView*	g_pD3D10RenderTarget;
 static ID3D10Device*			g_pD3D10Device;
-// directx 11
-static present_t				oD3D11Present;
-static resizeBuffers_t			oD3D11ResizeBuffers;
-static setRenderTargets11_t		oD3D11OMSetRenderTargets;
-static ID3D11RenderTargetView*	g_pD3D11RenderTarget;
-static ID3D11Device*			g_pD3D11Device;
-static ID3D11DeviceContext*		g_pD3D11DeviceContext;
+
+namespace dx11 {
+	static present_t				oPresent;
+	static resizeBuffers_t			oResizeBuffers;
+	static setRenderTargets11_t		oOMSetRenderTargets;
+	static ID3D11RenderTargetView*	g_pRenderTarget;
+	static ID3D11Device*			g_pDevice;
+	static ID3D11DeviceContext*		g_pDeviceContext;
+}
 
 namespace dx12 {
 	#include <dxgi1_4.h>
@@ -92,6 +95,7 @@ namespace dx12 {
 	static present_t oPresent;
 	static resizeBuffers_t oResizeBuffers;
 	static executeCommandLists_t oExecuteCommandLists;
+	static setRenderTargets12_t oOMSetRenderTargets;
 }
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -123,20 +127,24 @@ static HRESULT WINAPI	D3D10_HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT
 static HRESULT WINAPI	D3D10_HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags);
 static void				D3D10_CreateRenderTarget(IDXGISwapChain* pSwapChain);
 static void				D3D10_HookedOMSetRenderTargets(ID3D10Device*, UINT, ID3D10RenderTargetView* const*, ID3D10DepthStencilView*);
-// directx 11
-static void				D3D11_Hook();
-static HRESULT WINAPI	D3D11_HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
-static HRESULT WINAPI	D3D11_HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags);
-static void				D3D11_CreateRenderTarget(IDXGISwapChain* pSwapChain);
-static void				D3D11_HookedOMSetRenderTargets(ID3D11DeviceContext*, UINT, ID3D11RenderTargetView* const*, ID3D11DepthStencilView*);
+namespace dx11 {
+	static void				Hook();
+	static void				HookedOMSetRenderTargets(ID3D11DeviceContext*, UINT, ID3D11RenderTargetView* const*, ID3D11DepthStencilView*);
+	static void				CreateRenderTarget(IDXGISwapChain* pSwapChain);
+	static HRESULT WINAPI	HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
+	static HRESULT WINAPI	HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags);
+}
 namespace dx12 {
 	static void				Hook();
 	static HRESULT WINAPI	HookedPresent(IDXGISwapChain3* pSwapChain, UINT SyncInterval, UINT Flags);
 	static HRESULT WINAPI	HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT BufferCount, UINT Width, 
 												UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
 	static void WINAPI		HookedExecuteCommandLists(ID3D12CommandQueue* pCommandQueue, UINT NumCommandLists, ID3D12CommandList* ppCommandLists);
+	static void WINAPI		HookedOMSetRenderTargets(ID3D12GraphicsCommandList* pGraphicsCommandList, UINT NumRenderTargetDescriptors, 
+													 const D3D12_CPU_DESCRIPTOR_HANDLE* pRenderTargetDescriptors, BOOL RTsSingleHandleToDescriptorRange, 
+													 const D3D12_CPU_DESCRIPTOR_HANDLE* pDepthStencilDescriptor);
 	static void				CreateRenderTarget(IDXGISwapChain* pSwapChain);
-} // namespace dx12
+}
 
 void haxsdk::ImplementImGui() {
 	DWORD processId = GetProcessId(GetCurrentProcess());
@@ -156,13 +164,13 @@ void haxsdk::ImplementImGui() {
 				LOG_INFO << "DIRECTX9 graphics api found" << LOG_FLUSH;
 				//D3D9_Hook();
 			}
-			if (moduleName == "d3d11.dll") {
-				LOG_INFO << "DIRECTX11 graphics api found" << LOG_FLUSH;
-				//D3D11_Hook();
-			}
 			if (moduleName == "d3d10.dll") {
 				LOG_INFO << "DIRECTX10 graphics api found" << LOG_FLUSH;
-				//D3D10_Hook();
+				D3D10_Hook();
+			}
+			if (moduleName == "d3d11.dll") {
+				LOG_INFO << "DIRECTX11 graphics api found" << LOG_FLUSH;
+				dx11::Hook();
 			}
 			if (moduleName == "d3d12.dll") {
 				LOG_INFO << "DIRECTX12 graphics api found" << LOG_FLUSH;
@@ -241,10 +249,6 @@ static BOOL WINAPI HookedClipCursor(const RECT* lpRect) {
 }
 
 static void InitImGuiContext(ImGuiContextParams params) {
-	static bool inited = false;
-	if (inited) { return; }
-	inited = true;
-
 	HWND hwnd = 0;
 	if (params.api == GraphicsAPI::OpenGL) {
 		hwnd = WindowFromDC(params.hdc);
@@ -271,13 +275,13 @@ static void InitImGuiContext(ImGuiContextParams params) {
 	}
 	if (params.api == GraphicsAPI::D3D11) {
 		DXGI_SWAP_CHAIN_DESC swapChainDesc;
-		params.pSwapChain->GetDevice(IID_PPV_ARGS(&g_pD3D11Device));
+		params.pSwapChain->GetDevice(IID_PPV_ARGS(&dx11::g_pDevice));
 		params.pSwapChain->GetDesc(&swapChainDesc);
-		g_pD3D11Device->GetImmediateContext(&g_pD3D11DeviceContext);
+		dx11::g_pDevice->GetImmediateContext(&dx11::g_pDeviceContext);
 		hwnd = swapChainDesc.OutputWindow;
 		ImGui::CreateContext();
 		ImGui_ImplWin32_Init(hwnd);
-		ImGui_ImplDX11_Init(g_pD3D11Device, g_pD3D11DeviceContext);
+		ImGui_ImplDX11_Init(dx11::g_pDevice, dx11::g_pDeviceContext);
 	}
 	if (params.api == GraphicsAPI::D3D12) {
 		DXGI_SWAP_CHAIN_DESC swapChainDesc;
@@ -285,15 +289,12 @@ static void InitImGuiContext(ImGuiContextParams params) {
 		hwnd = swapChainDesc.OutputWindow;
 		ImGui::CreateContext();
 		ImGui_ImplWin32_Init(hwnd);
-		LOG_INFO << "WIN32INIT" << LOG_FLUSH;
 	}
 
-	LOG_INFO << "hwnd " << hwnd << LOG_FLUSH;
 	ImGuiIO& io = ImGui::GetIO();
 	io.WantCaptureMouse = true;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
 	oWndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
-	LOG_INFO << oWndproc << LOG_FLUSH;
 
 	oClipCursor = (clipCursor_t)GetProcAddress(GetModuleHandleA("user32.dll"), "ClipCursor");
 	DetourTransactionBegin();
@@ -313,7 +314,7 @@ static void OpenGL_Hook() {
 		LOG_ERROR << "[OPENGL] Unable to find wglSwapBuffers. Hook not installed" << LOG_FLUSH;
 		return;
 	}
-	LOG_INFO << "[OPENGL] wglSwapBuffers address is " << oSwapBuffers << LOG_FLUSH;
+	LOG_DEBUG << "[OPENGL] wglSwapBuffers address is " << oSwapBuffers << LOG_FLUSH;
 	DetourTransactionBegin();
 	DetourAttach(&(PVOID&)oSwapBuffers, OpenGL_HookedSwapBuffers);
 	DetourTransactionCommit();
@@ -325,7 +326,7 @@ static bool WINAPI OpenGL_HookedSwapBuffers(HDC hdc) {
 		inited = true;
 		ImGuiContextParams params = { GraphicsAPI::OpenGL, nullptr, hdc, nullptr };
 		InitImGuiContext(params);
-		LOG_WARNING << "GAME USES OPENGL" << LOG_FLUSH;
+		LOG_INFO << "GAME USES OPENGL" << LOG_FLUSH;
 	}
 
 	ImGui_ImplOpenGL3_NewFrame();
@@ -368,8 +369,8 @@ static void D3D9_Hook() {
 	oEndScene = (endScene_t)pVTable[42];
 	oReset = (reset_t)pVTable[16];
 
-	LOG_INFO << "[D3D9] IDirect3DDevice9::EndScene address is " << oEndScene << LOG_FLUSH;
-	LOG_INFO << "[D3D9] IDirect3DDevice9::Reset address is " << oReset << LOG_FLUSH;
+	LOG_DEBUG << "[D3D9] IDirect3DDevice9::EndScene address is " << oEndScene << LOG_FLUSH;
+	LOG_DEBUG << "[D3D9] IDirect3DDevice9::Reset address is " << oReset << LOG_FLUSH;
 
 	dummyDev->Release();
 	d3d9->Release();
@@ -386,7 +387,7 @@ static HRESULT WINAPI D3D9_HookedEndScene(LPDIRECT3DDEVICE9 pDevice) {
 		inited = true;
 		ImGuiContextParams params = { GraphicsAPI::D3D9, pDevice, 0, nullptr };
 		InitImGuiContext(params);
-		LOG_WARNING << "GAME USES DIRECTX9" << LOG_FLUSH;
+		LOG_INFO << "GAME USES DIRECTX9" << LOG_FLUSH;
 	}
 
 	ImGui_ImplDX9_NewFrame();
@@ -407,7 +408,7 @@ static HRESULT WINAPI D3D9_HookedReset(LPDIRECT3DDEVICE9 pDevice, D3DPRESENT_PAR
 	ImGui_ImplDX9_InvalidateDeviceObjects();
 	HRESULT result = oReset(pDevice, pPresentationParameters);
 	ImGui_ImplDX9_CreateDeviceObjects();
-	LOG_INFO << "[D3D9] Swap chain was reset" << LOG_FLUSH;
+	LOG_DEBUG << "[D3D9] Swap chain was reset" << LOG_FLUSH;
 	return result;
 }
 
@@ -440,9 +441,9 @@ static void D3D10_Hook() {
 	pVTable = *reinterpret_cast<void***>(pDevice);
 	oD3D10OMSetRenderTargets = (setRenderTargets_t)(pVTable[24]);
 
-	LOG_INFO << "[D3D10] IDXGISwapChain::Present address is " << oD3D10Present << LOG_FLUSH;
-	LOG_INFO << "[D3D10] IDXGISwapChain::ResizeBuffers address is " << oD3D10ResizeBuffers << LOG_FLUSH;
-	LOG_INFO << "[D3D10] ID3D10Device::OMSetRenderTargets address is " << oD3D10OMSetRenderTargets << LOG_FLUSH;
+	LOG_DEBUG << "[D3D10] IDXGISwapChain::Present address is " << oD3D10Present << LOG_FLUSH;
+	LOG_DEBUG << "[D3D10] IDXGISwapChain::ResizeBuffers address is " << oD3D10ResizeBuffers << LOG_FLUSH;
+	LOG_DEBUG << "[D3D10] ID3D10Device::OMSetRenderTargets address is " << oD3D10OMSetRenderTargets << LOG_FLUSH;
 
 	pSwapChain->Release();
 	pDevice->Release();
@@ -460,7 +461,7 @@ static HRESULT WINAPI D3D10_HookedPresent(IDXGISwapChain* pSwapChain, UINT syncI
 		inited = true;
 		ImGuiContextParams params = { GraphicsAPI::D3D10, nullptr, 0, pSwapChain };
 		InitImGuiContext(params);
-		LOG_INFO << "[D3D10] Present inited" << LOG_FLUSH;
+		LOG_DEBUG << "[D3D10] Present inited" << LOG_FLUSH;
 	}
 	if (!g_pD3D10RenderTarget) {
 		D3D10_CreateRenderTarget(pSwapChain);
@@ -485,7 +486,7 @@ static HRESULT WINAPI D3D10_HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT
 		g_pD3D10RenderTarget->Release();
 		g_pD3D10RenderTarget = nullptr;
 	}
-	LOG_INFO << "[D3D10] Buffers were resized" << LOG_FLUSH;
+	LOG_DEBUG << "[D3D10] Buffers were resized" << LOG_FLUSH;
 	return oD3D10ResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
 }
 
@@ -505,115 +506,115 @@ static void	D3D10_HookedOMSetRenderTargets(ID3D10Device* pDevice, UINT numViews,
 	static bool inited = false;
 	if (!inited) {
 		inited = true;
-		LOG_WARNING << "GAME USES DIRECTX10" << LOG_FLUSH;
+		LOG_INFO << "GAME USES DIRECTX10" << LOG_FLUSH;
 	}
 	oD3D10OMSetRenderTargets(pDevice, numViews, ppRenderTargetViews, pDepthStencilView);
 }
 
-//-----------------------------------------------------------------------------
-// [SECTION] DIRECT X 11
-//-----------------------------------------------------------------------------
 
-static void	D3D11_Hook() {
-	HMODULE module = GetModuleHandle("d3d11.dll");
+namespace dx11 {
+	static void	Hook() {
+		HMODULE module = GetModuleHandle("d3d11.dll");
 
-	DXGI_SWAP_CHAIN_DESC swapChainDesc = { };
-	swapChainDesc.Windowed = TRUE;
-	swapChainDesc.BufferCount = 2;
-	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-	swapChainDesc.OutputWindow = ::GetConsoleWindow();
-	swapChainDesc.SampleDesc.Count = 1;
+		DXGI_SWAP_CHAIN_DESC swapChainDesc = { };
+		swapChainDesc.Windowed = TRUE;
+		swapChainDesc.BufferCount = 2;
+		swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+		swapChainDesc.OutputWindow = ::GetConsoleWindow();
+		swapChainDesc.SampleDesc.Count = 1;
 
-	const D3D_FEATURE_LEVEL featureLevels[] = {
-		D3D_FEATURE_LEVEL_11_0,
-		D3D_FEATURE_LEVEL_10_0
-	};
-	IDXGISwapChain* pSwapChain;
-	ID3D11Device* pDevice;
-	HRESULT result = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_NULL, NULL, 0, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &pSwapChain, &pDevice, nullptr, &g_pD3D11DeviceContext);
-	if (result != S_OK) {
-		LOG_ERROR << "[D3D11] D3D11CreateDeviceAndSwapChain returned " << result << ". Hook not installed" << LOG_FLUSH;
-		return;
-	}
+		const D3D_FEATURE_LEVEL featureLevels[] = {
+			D3D_FEATURE_LEVEL_11_0,
+			D3D_FEATURE_LEVEL_10_0
+		};
+		IDXGISwapChain* pSwapChain;
+		ID3D11Device* pDevice;
+		HRESULT result = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_NULL, NULL, 0, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &pSwapChain, &pDevice, nullptr, &g_pDeviceContext);
+		if (result != S_OK) {
+			LOG_ERROR << "[D3D11] D3D11CreateDeviceAndSwapChain returned " << result << ". Hook not installed" << LOG_FLUSH;
+			return;
+		}
 
-	void** pVTable = *(void***)(pSwapChain);
-	oD3D11Present = (present_t)pVTable[8];
-	oD3D11ResizeBuffers = (resizeBuffers_t)pVTable[13];
-	pVTable = *(void***)(g_pD3D11DeviceContext);
-	oD3D11OMSetRenderTargets = (setRenderTargets11_t)pVTable[33];
+		void** pVTable = *(void***)(pSwapChain);
+		oPresent = (present_t)pVTable[8];
+		oResizeBuffers = (resizeBuffers_t)pVTable[13];
 
-	pSwapChain->Release();
-	pDevice->Release();
+		pVTable = *(void***)(g_pDeviceContext);
+		oOMSetRenderTargets = (setRenderTargets11_t)pVTable[33];
 
-	LOG_INFO << "[D3D11] ID3D11DeviceContext::OMSetRenderTargets address is " << oD3D11OMSetRenderTargets << LOG_FLUSH;
-	LOG_INFO << "[D3D11] IDXGISwapChain::Present address is " << oD3D11Present << LOG_FLUSH;
-	LOG_INFO << "[D3D11] IDXGISwapChain::ResizeBuffers address is " << oD3D11ResizeBuffers << LOG_FLUSH;
+		pSwapChain->Release();
+		pDevice->Release();
 
-	/*DetourTransactionBegin();
-	DetourAttach(&(PVOID&)oD3D11OMSetRenderTargets, D3D11_HookedOMSetRenderTargets);
-	DetourTransactionCommit();*/
-}
+		LOG_DEBUG << "[D3D11] OMSetRenderTargets address is " << oOMSetRenderTargets << LOG_FLUSH;
+		LOG_DEBUG << "[D3D11] Present address is " << oPresent << LOG_FLUSH;
+		LOG_DEBUG << "[D3D11] ResizeBuffers address is " << oResizeBuffers << LOG_FLUSH;
 
-static HRESULT WINAPI D3D11_HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags) {
-	static bool inited = false;
-	if (!inited) {
-		inited = true;
-		ImGuiContextParams params = { GraphicsAPI::D3D11, nullptr, 0, pSwapChain };
-		InitImGuiContext(params);
-		LOG_INFO << "[D3D11] Present inited" << LOG_FLUSH;
-	}
-	if (!g_pD3D11RenderTarget) {
-		D3D11_CreateRenderTarget(pSwapChain);
-	}
-	ImGui_ImplDX11_NewFrame();
-	ImGui_ImplWin32_NewFrame();
-	ImGui::NewFrame();
-	if (g_visible) {
-		ImGui::ShowDemoWindow();
-	}
-	ImGui::EndFrame();
-	ImGui::Render();
-	g_pD3D11DeviceContext->OMSetRenderTargets(1, &g_pD3D11RenderTarget, nullptr);
-	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
-	return oD3D11Present(pSwapChain, syncInterval, flags);
-}
-
-static HRESULT WINAPI D3D11_HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width,
-												UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags) {
-	if (g_pD3D11RenderTarget) {
-		g_pD3D11RenderTarget->Release();
-		g_pD3D11RenderTarget = nullptr;
-	}
-	LOG_INFO << "[D3D11] Buffers were resized" << LOG_FLUSH;
-	return oD3D11ResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
-}
-
-static void	D3D11_CreateRenderTarget(IDXGISwapChain* pSwapChain) {
-	ID3D11Texture2D* pBackBuffer = NULL;
-	pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
-	if (pBackBuffer && g_pD3D11Device) {
-		DXGI_SWAP_CHAIN_DESC sd;
-		pSwapChain->GetDesc(&sd);
-		g_pD3D11Device->CreateRenderTargetView(pBackBuffer, nullptr, &g_pD3D11RenderTarget);
-		pBackBuffer->Release();
-	}
-}
-
-static void	D3D11_HookedOMSetRenderTargets(ID3D11DeviceContext* pDevice, UINT numViews, ID3D11RenderTargetView* const* ppRenderTargetViews,
-										   ID3D11DepthStencilView* pDepthStencilView) {
-	static bool inited = false;
-	if (!inited) {
-		inited = true;
-		LOG_WARNING << "GAME USES DIRECTX11" << LOG_FLUSH;
 		DetourTransactionBegin();
-		DetourAttach(&(PVOID&)oD3D11Present, D3D11_HookedPresent);
-		DetourAttach(&(PVOID&)oD3D11ResizeBuffers, D3D11_HookedResizeBuffers);
+		DetourAttach(&(PVOID&)oOMSetRenderTargets, HookedOMSetRenderTargets);
 		DetourTransactionCommit();
 	}
-	oD3D11OMSetRenderTargets(pDevice, numViews, ppRenderTargetViews, pDepthStencilView);
-}
+
+	static void	CreateRenderTarget(IDXGISwapChain* pSwapChain) {
+		ID3D11Texture2D* pBackBuffer = NULL;
+		pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
+		if (pBackBuffer && g_pDevice) {
+			DXGI_SWAP_CHAIN_DESC sd;
+			pSwapChain->GetDesc(&sd);
+			g_pDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_pRenderTarget);
+			pBackBuffer->Release();
+		}
+	}
+
+	static HRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags) {
+		if (!ImGui::GetCurrentContext()) {
+			ImGuiContextParams params;
+			params.api = GraphicsAPI::D3D11;
+			params.pSwapChain = pSwapChain;
+			InitImGuiContext(params);
+		}
+
+		if (!g_pRenderTarget) {
+			CreateRenderTarget(pSwapChain);
+		}
+		ImGui_ImplDX11_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
+		if (g_visible) {
+			ImGui::ShowDemoWindow();
+		}
+		ImGui::EndFrame();
+		ImGui::Render();
+		g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTarget, nullptr);
+		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+		return oPresent(pSwapChain, syncInterval, flags);
+	}
+
+	static HRESULT WINAPI HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width,
+		UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags) {
+		if (g_pRenderTarget) {
+			g_pRenderTarget->Release();
+			g_pRenderTarget = nullptr;
+		}
+		LOG_DEBUG << "[D3D11] Buffers were resized" << LOG_FLUSH;
+		return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
+	}
+
+	static void	HookedOMSetRenderTargets(ID3D11DeviceContext* pDevice, UINT numViews, ID3D11RenderTargetView* const* ppRenderTargetViews,
+		ID3D11DepthStencilView* pDepthStencilView) {
+		static bool hooked = false;
+		if (!hooked) {
+			hooked = true;
+			LOG_INFO << "GAME USES DIRECTX11" << LOG_FLUSH;
+			DetourTransactionBegin();
+			//DetourAttach(&(PVOID&)oPresent, HookedPresent);
+			//DetourAttach(&(PVOID&)oResizeBuffers, HookedResizeBuffers);
+			DetourTransactionCommit();
+		}
+		oOMSetRenderTargets(pDevice, numViews, ppRenderTargetViews, pDepthStencilView);
+	}
+} // dx11
 
 namespace dx12 {
 	static void Hook() {
@@ -641,24 +642,30 @@ namespace dx12 {
 			return;
 		if (swapChain1->QueryInterface(IID_PPV_ARGS(&g_pSwapChain)) != S_OK)
 			return;
+		for (UINT i = 0; i < NUM_BACK_BUFFERS; ++i) {
+			if (g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&g_commandAllocators[i])) != S_OK) {
+				LOG_DEBUG << "CreateCommandAllocator failed" << LOG_FLUSH;
+				return;
+			}
+		}
+		if (g_pd3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, g_commandAllocators[0], NULL, IID_PPV_ARGS(&g_pd3dCommandList)) != S_OK)
+			return;
 		swapChain1->Release();
-
-		LOG_INFO << "[+] DirectX12: g_pd3dDevice: " << g_pd3dDevice << LOG_FLUSH;
-		LOG_INFO << "[+] DirectX12: g_dxgiFactory: " << g_dxgiFactory << LOG_FLUSH;
-		LOG_INFO << "[+] DirectX12: g_pd3dCommandQueue: " << g_pd3dCommandQueue << LOG_FLUSH;
-		LOG_INFO << "[+] DirectX12: g_pSwapChain: " << g_pSwapChain << LOG_FLUSH;
 
 		// Hook
 		void** pVTable = *reinterpret_cast<void***>(g_pSwapChain);
 		void** pCommandQueueVTable = *reinterpret_cast<void***>(g_pd3dCommandQueue);
+		void** pCommandListVTable = *reinterpret_cast<void***>(g_pd3dCommandList);
 
 		oPresent = (present_t)pVTable[8];
 		oResizeBuffers = (resizeBuffers_t)pVTable[13];
 		oExecuteCommandLists = (executeCommandLists_t)pCommandQueueVTable[10];
+		oOMSetRenderTargets = (setRenderTargets12_t)pCommandListVTable[46];
 
-		LOG_INFO << "[+] DirectX12: fnPresent: " << oPresent << LOG_FLUSH;
-		LOG_INFO << "[+] DirectX12: fnResizeBuffers: " << oResizeBuffers << LOG_FLUSH;
-		LOG_INFO << "[+] DirectX12: fnExecuteCommandLists: " << oExecuteCommandLists << LOG_FLUSH;
+		LOG_DEBUG << "[D3D12] oPresent address is " << oPresent << LOG_FLUSH;
+		LOG_DEBUG << "[D3D12] oResizeBuffers is " << oResizeBuffers << LOG_FLUSH;
+		LOG_DEBUG << "[D3D12] oExecuteCommandLists is " << oExecuteCommandLists << LOG_FLUSH;
+		LOG_DEBUG << "[D3D12] oOMSetRenderTargets is " << oOMSetRenderTargets << LOG_FLUSH;
 
 		if (g_pd3dCommandQueue) {
 			g_pd3dCommandQueue->Release();
@@ -701,18 +708,17 @@ namespace dx12 {
 		}
 
 		DetourTransactionBegin();
-		DetourAttach(&(PVOID&)oPresent, HookedPresent);
-		DetourAttach(&(PVOID&)oResizeBuffers, HookedResizeBuffers);
-		DetourAttach(&(PVOID&)oExecuteCommandLists, HookedExecuteCommandLists);
+		DetourAttach(&(PVOID&)oOMSetRenderTargets, HookedOMSetRenderTargets);
 		DetourTransactionCommit();
 	}
 
 	static HRESULT WINAPI HookedPresent(IDXGISwapChain3* pSwapChain, UINT SyncInterval, UINT Flags) {
-		if (!ImGui::GetIO().BackendPlatformUserData) {
+		if (!ImGui::GetCurrentContext()) {
 			ImGuiContextParams params;
 			params.api = GraphicsAPI::D3D12;
 			params.pSwapChain = pSwapChain;
 			InitImGuiContext(params);
+			LOG_INFO << "GAME USES DIRECTX12" << LOG_FLUSH;
 		}
 
 		if (!ImGui::GetIO().BackendRendererUserData) {
@@ -755,7 +761,6 @@ namespace dx12 {
 					DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeap,
 					g_pd3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart(),
 					g_pd3dSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
-				LOG_INFO << "IMPLDX12" << LOG_FLUSH;
 			}
 		}
 
@@ -787,7 +792,6 @@ namespace dx12 {
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 			g_pd3dCommandList->Reset(commandAllocator, NULL);
 			g_pd3dCommandList->ResourceBarrier(1, &barrier);
-
 			g_pd3dCommandList->OMSetRenderTargets(1, &g_mainRenderTargetDescriptor[backBufferIdx], FALSE, NULL);
 			g_pd3dCommandList->SetDescriptorHeaps(1, &g_pd3dSrvDescHeap);
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), g_pd3dCommandList);
@@ -819,6 +823,21 @@ namespace dx12 {
 		}
 
 		return oExecuteCommandLists(pCommandQueue, NumCommandLists, ppCommandLists);
+	}
+
+	static void WINAPI HookedOMSetRenderTargets(ID3D12GraphicsCommandList* pGraphicsCommandList, UINT NumRenderTargetDescriptors,
+												const D3D12_CPU_DESCRIPTOR_HANDLE* pRenderTargetDescriptors, BOOL RTsSingleHandleToDescriptorRange,
+												const D3D12_CPU_DESCRIPTOR_HANDLE* pDepthStencilDescriptor) {
+		static bool hooked = false;
+		if (!hooked && oPresent && oResizeBuffers && oExecuteCommandLists) {
+			hooked = true;
+			DetourTransactionBegin();
+			DetourAttach(&(PVOID&)oPresent, HookedPresent);
+			DetourAttach(&(PVOID&)oResizeBuffers, HookedResizeBuffers);
+			DetourAttach(&(PVOID&)oExecuteCommandLists, HookedExecuteCommandLists);
+			DetourTransactionCommit();
+		}
+		return oOMSetRenderTargets(pGraphicsCommandList, NumRenderTargetDescriptors, pRenderTargetDescriptors, RTsSingleHandleToDescriptorRange, pDepthStencilDescriptor);
 	}
 
 	static void CreateRenderTarget(IDXGISwapChain* pSwapChain) {

@@ -7,7 +7,7 @@
 
 namespace haxsdk {
 	struct Flush {};
-	enum LogLevel { INFO, WARNING, ERRO };
+	enum LogLevel { DEBUG, INFO, WARNING, ERRO };
 
 	class Logger {
 	public:
@@ -20,6 +20,7 @@ namespace haxsdk {
 		}
 		void operator<<(const haxsdk::Flush& v);
 	public:
+		Logger& LogDebug();
 		Logger& LogInfo();
 		Logger& LogWarning();
 		Logger& LogError();
@@ -32,6 +33,7 @@ namespace haxsdk {
 	public:
 		const haxsdk::Flush FLUSH{};
 	private:
+		std::mutex m_mutex; // thread-safety
 		LogLevel m_level;
 		LogLevel m_curLogLevel;
 		std::ostringstream m_ss;
@@ -41,8 +43,9 @@ namespace haxsdk {
 	extern Logger g_logger;
 }
 
-#define LOG_INIT(x) haxsdk::g_logger.Init(haxsdk::LogLevel::x)
-#define LOG_INFO haxsdk::g_logger.LogInfo()
-#define LOG_WARNING haxsdk::g_logger.LogWarning()
-#define LOG_ERROR haxsdk::g_logger.LogError()
-#define LOG_FLUSH haxsdk::g_logger.FLUSH
+#define LOG_INIT(x)		haxsdk::g_logger.Init(haxsdk::LogLevel::x)
+#define LOG_DEBUG		haxsdk::g_logger.LogDebug()
+#define LOG_INFO		haxsdk::g_logger.LogInfo()
+#define LOG_WARNING		haxsdk::g_logger.LogWarning()
+#define LOG_ERROR		haxsdk::g_logger.LogError()
+#define LOG_FLUSH		haxsdk::g_logger.FLUSH

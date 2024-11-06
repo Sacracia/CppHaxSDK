@@ -6,18 +6,20 @@
 #include <fstream>
 #include <time.h>
 #include <iomanip>
+#include <mutex>
 
 namespace haxsdk {
 	Logger g_logger;
 
 	void Logger::operator<<(const haxsdk::Flush& v) {
 		Flush();
+		m_mutex.unlock();
 	}
 
-	Logger& Logger::LogWarning()
+	Logger& Logger::LogDebug()
 	{
-		m_curLogLevel = LogLevel::WARNING;
-		LogHeader("WARNING");
+		m_curLogLevel = LogLevel::DEBUG;
+		LogHeader("DEBUG");
 		return *this;
 	}
 
@@ -25,6 +27,13 @@ namespace haxsdk {
 	{
 		m_curLogLevel = LogLevel::INFO;
 		LogHeader("INFO");
+		return *this;
+	}
+
+	Logger& Logger::LogWarning()
+	{
+		m_curLogLevel = LogLevel::WARNING;
+		LogHeader("WARNING");
 		return *this;
 	}
 
@@ -36,7 +45,7 @@ namespace haxsdk {
 	}
 
 	inline void Logger::LogHeader(std::string_view level) {
-		Flush(); 
+		m_mutex.lock();
 		auto t = std::time(nullptr);
 		m_ss << std::put_time(std::localtime(&t), "%d-%m-%Y %H:%M:%S") << 
 			" [" << std::left << std::setw(7) << level << "] ";
