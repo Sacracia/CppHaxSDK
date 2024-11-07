@@ -81,6 +81,9 @@
     <ClInclude Include="third_party\imgui\backend\imgui_impl_dx12.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="user.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -126,6 +129,9 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="user.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

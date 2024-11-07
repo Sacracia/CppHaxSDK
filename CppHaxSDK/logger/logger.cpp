@@ -13,7 +13,7 @@ namespace haxsdk {
 
 	void Logger::operator<<(const haxsdk::Flush& v) {
 		Flush();
-		m_mutex.unlock();
+        m_mutex.unlock();
 	}
 
 	Logger& Logger::LogDebug()
@@ -57,7 +57,9 @@ namespace haxsdk {
 		}
 		if (m_curLogLevel >= m_level) {
 			m_ss << '\n';
-			std::cout << m_ss.str();
+            if (m_useConsole) {
+                std::cout << m_ss.str();
+            }
 
 			std::ofstream file(m_filePath, std::ios::app);
 			file << m_ss.str();
@@ -70,9 +72,12 @@ namespace haxsdk {
 		return m_ss.tellp() == std::streampos(0);
 	}
 
-	void Logger::Init(LogLevel level) {
-		AllocConsole();
-		freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
+	void Logger::Init(LogLevel level, bool useConsole = false) {
+        m_useConsole = useConsole;
+        if (useConsole) {
+            AllocConsole();
+            freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
+        }
 
 		char buff[MAX_PATH];
 		GetModuleFileName(NULL, buff, MAX_PATH);
