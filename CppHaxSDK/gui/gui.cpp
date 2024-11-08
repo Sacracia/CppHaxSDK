@@ -658,7 +658,7 @@ namespace dx12 {
 
         IDXGISwapChain1* swapChain1 = NULL;
         if (CreateDXGIFactory1(IID_PPV_ARGS(&g_dxgiFactory)) != S_OK) { return; }
-        if (g_dxgiFactory->CreateSwapChainForHwnd(g_pd3dCommandQueue, GetConsoleWindow(), &sd, NULL, NULL, &swapChain1) != S_OK) { return; }
+        if (g_dxgiFactory->CreateSwapChainForHwnd(g_pd3dCommandQueue, g_dummyHWND, &sd, NULL, NULL, &swapChain1) != S_OK) { return; }
         if (swapChain1->QueryInterface(IID_PPV_ARGS(&g_pSwapChain)) != S_OK) { return; }
         for (UINT i = 0; i < NUM_BACK_BUFFERS; ++i) {
             if (g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&g_commandAllocators[i])) != S_OK) {
