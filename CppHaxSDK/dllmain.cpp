@@ -5,13 +5,15 @@
 #include "logger/logger.h"
 #include "gui/gui.h"
 #include "user.h"
+#include "mono/mono.h"
 
 void Start() {
-    ImplementationDetails details;
-    details.ApplyStyleProc = ApplyStyle;
+	LOG_INIT(DEBUG, true);
+	mono::Initialize();
 
-	LOG_INIT(DEBUG, false);
-	haxsdk::ImplementImGui(details);
+    /*ImplementationDetails details;
+    details.ApplyStyleProc = ApplyStyle;
+	haxsdk::ImplementImGui(details);*/
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {
