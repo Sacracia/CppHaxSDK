@@ -180,7 +180,8 @@
     <ClInclude Include="gui\gui.h" />
     <ClInclude Include="logger\logger.h" />
     <ClInclude Include="mono\mono.h" />
-    <ClInclude Include="mono\mono_api.h" />
+    <ClInclude Include="mono\mono_api_functions.h" />
+    <ClInclude Include="mono\mono_game_functions.h" />
     <ClInclude Include="third_party\detours\x64\detours.h" />
     <ClInclude Include="third_party\detours\x64\detver.h" />
     <ClInclude Include="third_party\detours\x64\syelog.h" />

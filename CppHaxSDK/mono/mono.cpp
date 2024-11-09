@@ -3,8 +3,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <TlHelp32.h>
+#include <sstream>
 
-#include "mono_api.h"
 #include "../logger/logger.h"
 
 #ifndef HAX_ASSERT
@@ -12,11 +12,49 @@
 #define HAX_ASSERT(_EXPR) assert(_EXPR)
 #endif
 
-#define DO_API(r, n, p) r(*n)p
-#include "mono_api.h"
-#undef DO_API
+#define MONO_API_FUNC(r, n, p) r(*n)p
+#include "mono_api_functions.h"
+#undef MONO_API_FUNC
 
-static HMODULE GetMonoModule() {
+#define MONO_GAME_FUNC(r, n, p, s) r(*n)p
+#include "mono_game_functions.h"
+#undef MONO_GAME_FUNC
+
+MonoDomain* domain;
+
+static HMODULE  GetMonoHandle();
+static void     InitMonoApi(HMODULE hMono);
+static void     InitGameFunctions();
+static void*    GetFuncAddress(std::string signature);
+
+void mono::Initialize() {
+    HMODULE hMono = GetMonoHandle();
+    HAX_ASSERT(hMono != NULL && "Game not using mono");
+
+    InitMonoApi(hMono);
+
+    domain = mono_get_root_domain();
+    mono_thread_attach(domain);
+    mono_thread_attach(mono_domain_get());
+
+    InitGameFunctions();
+}
+
+static void InitMonoApi(HMODULE hMono) {
+    #define MONO_API_FUNC(r, n, p) n = (r(*)p)(GetProcAddress(hMono, #n));\
+						           LOG_DEBUG << #n << " address is " << n << LOG_FLUSH
+    #include "mono_api_functions.h"
+    #undef MONO_API_FUNC
+}
+
+static void InitGameFunctions() {
+    #define MONO_GAME_FUNC(r, n, p, s) n = (r(*)p)GetFuncAddress(s);\
+                                       LOG_DEBUG << #n << " address is " << n << LOG_FLUSH
+    #include "mono_game_functions.h"
+    #undef MONO_GAME_FUNC
+}
+
+static HMODULE GetMonoHandle() {
 	DWORD processId = GetProcessId(GetCurrentProcess());
 	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, processId);
 
@@ -36,16 +74,33 @@ static HMODULE GetMonoModule() {
 	return NULL;
 }
 
-void mono::Initialize() {
-	HMODULE monoModule = GetMonoModule();
-	HAX_ASSERT(monoModule != NULL && "Game not using mono");
+static void* GetFuncAddress(std::string signature) {
+    std::string assemblyName = signature.substr(0, signature.find(", "));
+    signature.erase(0, assemblyName.length() + 2);
+    std::string sig = signature;
+    std::string name_space = "";
+    if (auto pos = signature.find("."); pos != std::string::npos) {
+        name_space = signature.substr(0, pos);
+        signature.erase(0, name_space.length() + 1);
+    }
+    std::string klassName = signature.substr(0, signature.find(':'));
 
-	#define DO_API(r, n, p) n = (r(*)p)(GetProcAddress(monoModule, #n));\
-								LOG_DEBUG << #n << " address is " << n << LOG_FLUSH
-	#include "mono_api.h"
-	#undef DO_API
+    MonoAssembly* assembly = mono_domain_assembly_open(domain, assemblyName.c_str());
+    HAX_ASSERT(assembly != nullptr && "mono_domain_assembly_open failed");
 
-	MonoDomain* domain = mono_get_root_domain();
-	mono_thread_attach(domain);
-	mono_thread_attach(mono_domain_get());
+    MonoImage* image = mono_assembly_get_image(assembly);
+    HAX_ASSERT(image != nullptr && "mono_assembly_get_image failed");
+
+    MonoClass* klass = mono_class_from_name(image, name_space.c_str(), klassName.c_str());
+    HAX_ASSERT(klass != nullptr && "mono_class_from_name failed");
+
+    void* iter = nullptr;
+    MonoMethod* method;
+    while (method = mono_class_get_methods(klass, &iter)) {
+        if (sig == mono_method_full_name(method, 1)) {
+            return mono_compile_method(method);
+        }
+    }
+
+    return nullptr;
 }

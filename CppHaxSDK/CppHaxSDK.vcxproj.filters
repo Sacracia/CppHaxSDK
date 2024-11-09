@@ -84,10 +84,13 @@
     <ClInclude Include="user.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="mono\mono_api.h">
+    <ClInclude Include="mono\mono_api_functions.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="mono\mono.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="mono\mono_game_functions.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
