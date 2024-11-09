@@ -12,20 +12,7 @@
 #define HAX_ASSERT(_EXPR) assert(_EXPR)
 #endif
 
-struct MonoThread;
-struct MonoDomain;
-struct MonoAssembly;
-struct MonoObject;
-struct MonoType;
-struct MonoClass;
-struct MonoImage;
-struct MonoMethod;
-struct MonoString;
-struct MonoField;
-struct MonoVTable;
-struct MonoArray;
-
-#define DO_API(r, n, p) r (*n) p
+#define DO_API(r, n, p) r(*n)p
 #include "mono_api.h"
 #undef DO_API
 
@@ -53,11 +40,12 @@ void mono::Initialize() {
 	HMODULE monoModule = GetMonoModule();
 	HAX_ASSERT(monoModule != NULL && "Game not using mono");
 
-	#define DO_API(r, n, p) n = (r (*) p)(GetProcAddress(monoModule, #n))
+	#define DO_API(r, n, p) n = (r(*)p)(GetProcAddress(monoModule, #n));\
+								LOG_DEBUG << #n << " address is " << n << LOG_FLUSH
 	#include "mono_api.h"
 	#undef DO_API
 
-	LOG_INFO << "mono_get_root_domain address is " << mono_get_root_domain;
-	LOG_INFO << "mono_thread_attach address is " << mono_thread_attach;
-	LOG_INFO << "mono_domain_get address is " << mono_domain_get;
+	MonoDomain* domain = mono_get_root_domain();
+	mono_thread_attach(domain);
+	mono_thread_attach(mono_domain_get());
 }

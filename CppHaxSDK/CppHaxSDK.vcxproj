@@ -96,6 +96,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x86;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories);$(SolutionDir)CppHaxSDK\logger;$(SolutionDir)CppHaxSDK\gui</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -118,6 +119,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x86;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories);$(SolutionDir)CppHaxSDK\logger;$(SolutionDir)CppHaxSDK\gui</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
