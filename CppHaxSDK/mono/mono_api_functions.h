@@ -1,4 +1,7 @@
 
+#include "mono_api_classes.h"
+#include <stdint.h>
+
 #ifdef MONO_API_FUNC
 MONO_API_FUNC(MonoDomain*, mono_get_root_domain, ());
 MONO_API_FUNC(MonoAssembly*, mono_domain_assembly_open, (MonoDomain* domain, const char* name));

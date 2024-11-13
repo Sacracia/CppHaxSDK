@@ -93,6 +93,15 @@
     <ClInclude Include="mono\mono_game_functions.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
+    <ClInclude Include="mono\mono_api_classes.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="mono\mono_game_classes.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="mono\utils.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -146,6 +155,12 @@
     <ClCompile Include="mono\mono.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="mono\mono_game_classes.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="mono\utils.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Library Include="third_party\detours\x86\detours.lib" />
@@ -154,5 +169,6 @@
   <ItemGroup>
     <None Include="third_party\detours\x86\detours.pdb" />
     <None Include="third_party\detours\x64\detours.pdb" />
+    <None Include="cpp.hint" />
   </ItemGroup>
 </Project>

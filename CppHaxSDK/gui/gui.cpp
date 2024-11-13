@@ -43,6 +43,10 @@
 
 #include "../logger/logger.h"
 
+#define MONO_GAME_FUNC(r, n, p, s) extern r(*n)p
+#include "../mono/mono_game_functions.h"
+#undef MONO_GAME_FUNC
+
 using setCursorPos_t            = BOOL(WINAPI*)(int, int);
 using clipCursor_t              = BOOL(WINAPI*)(const RECT*);
 using swapBuffers_t             = bool(WINAPI*)(HDC);
@@ -402,7 +406,7 @@ namespace opengl {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         if (g_visible) {
-            ImGui::ShowDemoWindow();
+            g_details.DrawMenuProc(nullptr);
         }
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -462,7 +466,7 @@ namespace dx9 {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         if (g_visible) {
-            ImGui::ShowDemoWindow();
+            g_details.DrawMenuProc(nullptr);
         }
         ImGui::EndFrame();
 
@@ -483,6 +487,10 @@ namespace dx9 {
 
 namespace dx10 {
     static void Setup() {
+        if (oPresent && oResizeBuffers) {
+            return;
+        }
+
         HMODULE module = GetModuleHandle("d3d10.dll");
 
         DXGI_SWAP_CHAIN_DESC swapChainDesc = { };
@@ -528,7 +536,7 @@ namespace dx10 {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         if (g_visible) {
-            ImGui::ShowDemoWindow();
+            g_details.DrawMenuProc(nullptr);
         }
         ImGui::EndFrame();
         ImGui::Render();
@@ -561,6 +569,10 @@ namespace dx10 {
 
 namespace dx11 {
     static void Setup() {
+        if (oPresent && oResizeBuffers) {
+            return;
+        }
+
         HMODULE module = GetModuleHandle("d3d11.dll");
 
         DXGI_SWAP_CHAIN_DESC swapChainDesc = { };
@@ -620,7 +632,7 @@ namespace dx11 {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         if (g_visible) {
-            ImGui::ShowDemoWindow();
+            g_details.DrawMenuProc(nullptr);
         }
         ImGui::EndFrame();
         ImGui::Render();
@@ -788,7 +800,7 @@ namespace dx12 {
             ImGui::NewFrame();
 
             if (g_visible) {
-                ImGui::ShowDemoWindow();
+                g_details.DrawMenuProc(nullptr);
             }
 
             ImGui::Render();

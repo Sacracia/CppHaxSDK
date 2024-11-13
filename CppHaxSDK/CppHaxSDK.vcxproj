@@ -180,8 +180,11 @@
     <ClInclude Include="gui\gui.h" />
     <ClInclude Include="logger\logger.h" />
     <ClInclude Include="mono\mono.h" />
+    <ClInclude Include="mono\mono_api_classes.h" />
     <ClInclude Include="mono\mono_api_functions.h" />
+    <ClInclude Include="mono\mono_game_classes.h" />
     <ClInclude Include="mono\mono_game_functions.h" />
+    <ClInclude Include="mono\utils.h" />
     <ClInclude Include="third_party\detours\x64\detours.h" />
     <ClInclude Include="third_party\detours\x64\detver.h" />
     <ClInclude Include="third_party\detours\x64\syelog.h" />
@@ -209,6 +212,8 @@
     <ClCompile Include="gui\gui.cpp" />
     <ClCompile Include="logger\logger.cpp" />
     <ClCompile Include="mono\mono.cpp" />
+    <ClCompile Include="mono\mono_game_classes.cpp" />
+    <ClCompile Include="mono\utils.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp" />
@@ -228,6 +233,7 @@
     <Library Include="third_party\detours\x86\detours.lib" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="cpp.hint" />
     <None Include="third_party\detours\x64\detours.pdb" />
     <None Include="third_party\detours\x86\detours.pdb" />
   </ItemGroup>
