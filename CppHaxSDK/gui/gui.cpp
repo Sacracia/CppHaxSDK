@@ -43,9 +43,11 @@
 
 #include "../logger/logger.h"
 
-#define MONO_GAME_FUNC(r, n, p, s) extern r(*n)p
-#include "../mono/mono_game_functions.h"
-#undef MONO_GAME_FUNC
+#ifdef USE_MONO
+#define MONO_API_FUNC(r, n, p) extern r(*n)p
+#include "../mono/mono_api_functions.h"
+#undef MONO_API_FUNC
+#endif
 
 using setCursorPos_t            = BOOL(WINAPI*)(int, int);
 using clipCursor_t              = BOOL(WINAPI*)(const RECT*);
@@ -261,6 +263,12 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
 }
 
 static void InitImGuiContext(const ImGuiContextParams& params) {
+    #ifdef USE_MONO
+    MonoDomain* domain = mono_get_root_domain();
+    mono_thread_attach(domain);
+    mono_thread_attach(mono_domain_get());
+    #endif
+
     HWND hwnd = 0;
     if (params.api == GraphicsAPI::OpenGL) {
         hwnd = WindowFromDC(params.hdc);
@@ -308,7 +316,7 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
     }
 
     ImGuiIO& io = ImGui::GetIO();
-    io.WantCaptureMouse = true;
+    io.WantCaptureMouse = g_visible;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
     oWndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
 
@@ -327,15 +335,14 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
     io.MousePos.y = (float)position.y;
 
     if (uMsg == WM_KEYUP && wParam == VK_OEM_3) { 
-        g_visible = !g_visible; 
+        g_visible = !g_visible;
+        io.MouseDrawCursor = g_visible;
     }
 
     if (g_visible) {
         RECT rect;
         GetWindowRect(hWnd, &rect);
         HookedClipCursor(&rect);
-
-        io.MouseDrawCursor = true;
 
         ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam);
         switch (uMsg) {
@@ -368,7 +375,6 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
             return true;
         }
     }
-    io.MouseDrawCursor = false;
     return CallWindowProc(oWndproc, hWnd, uMsg, wParam, lParam);
 }
 

@@ -8,6 +8,8 @@ struct MonoClass;
 struct MonoImage;
 struct MonoMethod;
 struct MonoString;
+struct MonoVTable;
+struct MonoArray;
 
 struct MonoObject {
 };
@@ -18,6 +20,3 @@ struct MonoClassField {
     MonoClass* parent;
     int         offset;
 };
-
-struct MonoVTable;
-struct MonoArray;

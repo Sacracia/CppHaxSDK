@@ -25,29 +25,49 @@
 
 MonoDomain* domain;
 
-static HMODULE  GetMonoHandle();
-static void     InitMonoApi(HMODULE hMono);
-static void     InitGameFunctions();
-static void*    GetFuncAddress(std::string signature);
-static MonoClass* GetMonoClass(const char* assemblyName, const char* name_space, const char* klassName);
+static HMODULE      GetMonoHandle();
+static void         InitMonoApi(HMODULE hMono);
+static void         InitGameFunctions();
+static void*        GetFuncAddress(std::string signature);
+static MonoClass*   GetMonoClass(const char* assemblyName, const char* name_space, const char* klassName);
+static MonoClass*   GetMonoClass(MonoObject* object);
 
-void mono::Initialize() {
-    HMODULE hMono = GetMonoHandle();
-    HAX_ASSERT(hMono != NULL && "Game not using mono");
+namespace mono {
+    void Initialize() {
+        HMODULE hMono = GetMonoHandle();
+        HAX_ASSERT(hMono != NULL && "Game not using mono");
 
-    InitMonoApi(hMono);
+        InitMonoApi(hMono);
 
-    domain = mono_get_root_domain();
-    mono_thread_attach(domain);
-    mono_thread_attach(mono_domain_get());
+        domain = mono_get_root_domain();
+        mono_thread_attach(domain);
+        mono_thread_attach(mono_domain_get());
 
-    InitGameFunctions();
-}
+        InitGameFunctions();
+    }
+
+    void* GetStaticField(MonoClass*& klass, const char* assemblyName, const char* name_space,
+        const char* klassName, const char* fieldName) {
+        if (!klass) {
+            klass = GetMonoClass(assemblyName, name_space, klassName);
+        }
+        MonoVTable* vtable = mono_class_vtable(domain, klass);
+        MonoClassField* field = mono_class_get_field_from_name(klass, fieldName);
+        void* ptr = mono_vtable_get_static_field_data(vtable);
+        return (void*)((char*)mono_vtable_get_static_field_data(vtable) + field->offset);
+    }
+
+    int GetFieldOffset(MonoClass*& klass, MonoObject* object, const char* fieldName) {
+        if (!klass) {
+            klass = mono_object_get_class(object);
+        }
+        return mono_class_get_field_from_name(klass, fieldName)->offset;
+    }
+} // mono
 
 static void InitMonoApi(HMODULE hMono) {
     #define MONO_API_FUNC(r, n, p)                          \
         n = (r(*)p)(GetProcAddress(hMono, #n));             \
-        LOG_DEBUG << #n " address is " << n << LOG_FLUSH;   \
         HAX_ASSERT(n && #n " not found")
     #include "mono_api_functions.h"
     #undef MONO_API_FUNC
@@ -62,16 +82,6 @@ static void InitGameFunctions() {
     #undef MONO_GAME_FUNC
 }
 
-static MonoClass* GetMonoClass(const char* assemblyName, const char* name_space, const char* klassName) {
-    MonoAssembly* assembly = mono_domain_assembly_open(domain, assemblyName);
-    HAX_ASSERT(assembly != nullptr && "mono_domain_assembly_open failed");
-    MonoImage* image = mono_assembly_get_image(assembly);
-    HAX_ASSERT(image != nullptr && "mono_assembly_get_image failed");
-    MonoClass* klass = mono_class_from_name(image, name_space, klassName);
-    HAX_ASSERT(klass != nullptr && "mono_class_from_name failed");
-    return klass;
-}
-
 static HMODULE GetMonoHandle() {
 	DWORD processId = GetProcessId(GetCurrentProcess());
 	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, processId);
@@ -81,7 +91,7 @@ static HMODULE GetMonoHandle() {
 
 	if (Module32First(snapshot, &me)) {
 		do {
-			if (strncmp(me.szModule, "mono", 4) == 0) {
+            if (GetProcAddress(me.hModule, "mono_thread_attach")) {
 				CloseHandle(snapshot);
 				return me.hModule;
 			}
@@ -102,15 +112,7 @@ static void* GetFuncAddress(std::string signature) {
         signature.erase(0, name_space.length() + 1);
     }
     std::string klassName = signature.substr(0, signature.find(':'));
-
-    MonoAssembly* assembly = mono_domain_assembly_open(domain, assemblyName.c_str());
-    HAX_ASSERT(assembly != nullptr && "mono_domain_assembly_open failed");
-
-    MonoImage* image = mono_assembly_get_image(assembly);
-    HAX_ASSERT(image != nullptr && "mono_assembly_get_image failed");
-
-    MonoClass* klass = mono_class_from_name(image, name_space.c_str(), klassName.c_str());
-    HAX_ASSERT(klass != nullptr && "mono_class_from_name failed");
+    MonoClass* klass = GetMonoClass(assemblyName.c_str(), name_space.c_str(), klassName.c_str());
 
     void* iter = nullptr;
     MonoMethod* method;
@@ -121,4 +123,18 @@ static void* GetFuncAddress(std::string signature) {
     }
 
     return nullptr;
+}
+
+static MonoClass* GetMonoClass(const char* assemblyName, const char* name_space, const char* klassName) {
+    MonoAssembly* assembly = mono_domain_assembly_open(domain, assemblyName);
+    HAX_ASSERT(assembly != nullptr && "mono_domain_assembly_open failed");
+    MonoImage* image = mono_assembly_get_image(assembly);
+    HAX_ASSERT(image != nullptr && "mono_assembly_get_image failed");
+    MonoClass* klass = mono_class_from_name(image, name_space, klassName);
+    HAX_ASSERT(klass != nullptr && "mono_class_from_name failed");
+    return klass;
+}
+
+static MonoClass* GetMonoClass(MonoObject* object) {
+    return mono_object_get_class(object);
 }

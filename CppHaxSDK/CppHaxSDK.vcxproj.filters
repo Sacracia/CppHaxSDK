@@ -99,7 +99,10 @@
     <ClInclude Include="mono\mono_game_classes.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="mono\utils.h">
+    <ClInclude Include="mono\mono_sdk.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="hooks\hooks.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -158,7 +161,7 @@
     <ClCompile Include="mono\mono_game_classes.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="mono\utils.cpp">
+    <ClCompile Include="hooks\hooks.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

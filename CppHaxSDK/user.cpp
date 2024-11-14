@@ -4,11 +4,41 @@
 
 #include "third_party/imgui/imgui.h"
 
+#define MONO_GAME_FUNC(r, n, p, s) extern r(*n)p
+#include "mono/mono_game_functions.h"
+#undef MONO_GAME_FUNC
+
+bool isInstaKill = false;
+bool isInvincible = false;
+
 static ImVec4 HexToColor(std::string hex_string);
+
+void RenderMenu(bool*) {
+    HeroController* pHeroController = *HeroController::_instance();
+
+    ImGui::SetNextWindowBgAlpha(1);
+    ImGui::Begin("Menu", NULL);
+    if (pHeroController) {
+        PlayerData* pPlayerData = *pHeroController->playerData();
+        ImGui::Checkbox("Infinite Air Jump", pPlayerData->infiniteAirJump());
+        ImGui::Checkbox("InstaKill", &isInstaKill);
+        ImGui::Checkbox("Invincible", &isInvincible);
+        if (ImGui::Button("+100 Geo")) {
+            HeroController_AddGeo(pHeroController, 100);
+        }
+        if (ImGui::Button("+1000 Geo")) {
+            HeroController_AddGeo(pHeroController, 1000);
+        }
+        if (ImGui::Button("+10000 Geo")) {
+            HeroController_AddGeo(pHeroController, 10000);
+        }
+    }
+    ImGui::End();
+}
 
 void ApplyStyle() {
     ImGuiIO& io = ImGui::GetIO();
-    ImFont* font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\trebucbd.ttf", 16);
+    ImFont* font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\trebucbd.ttf", 13);
 
     ImGuiStyle* styles = &ImGui::GetStyle();
     auto colors = styles->Colors;
@@ -107,10 +137,6 @@ void ApplyStyle() {
     styles->WindowPadding = ImVec2(8.0, 8.0);
     styles->WindowRounding = 0.0;
     styles->WindowTitleAlign = ImVec2(0.0, 0.5);
-}
-
-void RenderMenu(bool*) {
-    ImGui::ShowDemoWindow();
 }
 
 static ImVec4 HexToColor(std::string hex_string) {

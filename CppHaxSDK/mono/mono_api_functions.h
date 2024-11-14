@@ -16,6 +16,7 @@ MONO_API_FUNC(MonoClass*, mono_class_from_name, (MonoImage* image, const char* n
 MONO_API_FUNC(MonoMethod*, mono_class_get_methods, (MonoClass* klass, void** iter));
 MONO_API_FUNC(MonoClassField*, mono_class_get_field_from_name, (MonoClass* klass, const char* name));
 MONO_API_FUNC(MonoVTable*, mono_class_vtable, (MonoDomain* domain, MonoClass* klass));
+MONO_API_FUNC(MonoClass*, mono_object_get_class, (MonoObject* object));
 
 // method
 MONO_API_FUNC(const char*, mono_method_full_name, (MonoMethod* method, int32_t signature));
