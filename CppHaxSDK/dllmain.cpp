@@ -4,19 +4,16 @@
 
 #include "logger/logger.h"
 #include "gui/gui.h"
-#include "user.h"
 #include "mono/mono.h"
-#include "../hooks/hooks.h"
+#include "cheat/cheat.h"
+#include "cheat/hooks/hooks.h"
+
+ImplementationDetails details;
 
 static void Start() {
 	LOG_INIT(DEBUG, true);
 	mono::Initialize();
-
-    //hooks::SetupHooks();
-
-    ImplementationDetails details;
-    details.ApplyStyleProc = ApplyStyle;
-    details.DrawMenuProc = RenderMenu;
+    cheat::Initialize();
 	haxsdk::ImplementImGui(details);
 }
 

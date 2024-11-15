@@ -1,25 +1,29 @@
 #pragma once
 
-#include <stdint.h>
-
-#include "mono_api_classes.h"
+#include "../mono/mono_api_classes.h"
 
 class PlayerData;
+class Transform;
 
 class HeroController : public MonoObject {
     inline static MonoClass* klass = nullptr;
 public:
     static HeroController** _instance();
-public:
     PlayerData** playerData();
+    Transform** transform();
 };
 
 class PlayerData : public MonoObject {
     inline static MonoClass* klass = nullptr;
 public:
-    static PlayerData** _instance();
 public:
+    static PlayerData** _instance();
     bool* infiniteAirJump();
     bool* isInvincible();
-    List<String>** scenesVisited();
+    List<String*>** scenesVisited();
+};
+
+class Transform : public MonoObject {
+public:
+    Vector3 get_position();
 };

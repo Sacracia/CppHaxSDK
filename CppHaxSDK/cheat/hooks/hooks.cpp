@@ -4,7 +4,8 @@
 #include <Windows.h>
 
 #define MONO_GAME_FUNC(r, n, p, s) extern r(*n)p
-#include "../mono/mono_game_functions.h"
+#include "../game/game_classes.h"
+#include "../game/game_functions.h"
 #undef MONO_GAME_FUNC
 
 #ifdef _WIN64

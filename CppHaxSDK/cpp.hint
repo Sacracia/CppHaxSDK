@@ -1,5 +1,0 @@
-// Файлы указаний помогают среде IDE Visual Studio интерпретировать идентификаторы Visual C++
-// (например, имена функций и макросов).
-// Дополнительные сведения: https://go.microsoft.com/fwlink/?linkid=865984
-#define FIELD(c, t, n, a, ns) t*c::n(){static int offset = -1;if (offset < 0) { if (klass == nullptr) { klass = GetMonoClass(a, ns, #c); } offset = mono_class_get_field_from_name(klass, #n)->offset;}return (t*)((char*)this + offset)};
-#define STATIC_FIELD(c, t, n, a, ns) t* c::n() { static t* address = nullptr; if (address == nullptr) { if (klass == nullptr) { klass = utils::GetMonoClass(a, ns, #c); } MonoVTable* vtable = mono_class_vtable(domain, klass); MonoClassField* field = mono_class_get_field_from_name(klass, #n); void* ptr = mono_vtable_get_static_field_data(vtable); address = (HeroController**)((char*)mono_vtable_get_static_field_data(vtable) + field->offset); } return address; }

@@ -81,28 +81,28 @@
     <ClInclude Include="third_party\imgui\backend\imgui_impl_dx12.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="user.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="mono\mono_api_functions.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="mono\mono.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="mono\mono_game_functions.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="mono\mono_api_classes.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="mono\mono_game_classes.h">
+    <ClInclude Include="cheat\game\game_functions.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="cheat\hooks\hooks.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="cheat\cheat.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="cheat\game\game_classes.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="mono\mono_sdk.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="hooks\hooks.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -152,16 +152,16 @@
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="user.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
     <ClCompile Include="mono\mono.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="mono\mono_game_classes.cpp">
+    <ClCompile Include="cheat\hooks\hooks.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="hooks\hooks.cpp">
+    <ClCompile Include="cheat\cheat.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="cheat\game\game_classes.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
@@ -172,6 +172,5 @@
   <ItemGroup>
     <None Include="third_party\detours\x86\detours.pdb" />
     <None Include="third_party\detours\x64\detours.pdb" />
-    <None Include="cpp.hint" />
   </ItemGroup>
 </Project>

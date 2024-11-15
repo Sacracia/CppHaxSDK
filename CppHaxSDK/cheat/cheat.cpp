@@ -1,26 +1,57 @@
-#include "user.h"
+#include "cheat.h"
 
-#include <string>
 #include <iostream>
+#include <assert.h>
 
-#include "third_party/imgui/imgui.h"
+#include "../mono/mono_sdk.h"
+#include "hooks/hooks.h"
+#include "../third_party/imgui/imgui.h"
 
-#define MONO_GAME_FUNC(r, n, p, s) extern r(*n)p
-#include "mono/mono_game_functions.h"
+#define MONO_GAME_FUNC(r, n, p, s) r(*n)p
+#include "game/game_classes.h"
+#include "game/game_functions.h"
 #undef MONO_GAME_FUNC
 
-bool isInstaKill = false;
-bool isInvincible = false;
+struct ImplementationDetails {
+    void(*ApplyStyleProc)();
+    void(*DrawMenuProc)(bool*); // bool* added to be compatible with ImGui::ShowDemoWindow
+};
+
+extern ImplementationDetails details;
+bool isInstaKill;
+bool isInvincible;
 
 static ImVec4 HexToColor(std::string hex_string);
+static void InitGameFunctions();
+static void RenderMenu(bool*);
+static void ApplyStyle();
 
-void RenderMenu(bool*) {
+void cheat::Initialize() {
+    InitGameFunctions();
+    hooks::SetupHooks();
+
+    details.ApplyStyleProc = ApplyStyle;
+    details.DrawMenuProc = RenderMenu;
+}
+
+static void InitGameFunctions() {
+#define MONO_GAME_FUNC(r, n, p, s)                          \
+        n = (r(*)p)mono::GetFuncAddress(s);                 \
+        std::cout << #n " address is " << n << '\n';        \
+        assert(n && #n " not found")
+#include "game/game_functions.h"
+#undef MONO_GAME_FUNC
+}
+
+static void RenderMenu(bool*) {
     HeroController* pHeroController = *HeroController::_instance();
 
     ImGui::SetNextWindowBgAlpha(1);
     ImGui::Begin("Menu", NULL);
     if (pHeroController) {
         PlayerData* pPlayerData = *pHeroController->playerData();
+        Transform* pTransform = *pHeroController->transform();
+
         ImGui::Checkbox("Infinite Air Jump", pPlayerData->infiniteAirJump());
         ImGui::Checkbox("InstaKill", &isInstaKill);
         ImGui::Checkbox("Invincible", &isInvincible);
@@ -38,15 +69,17 @@ void RenderMenu(bool*) {
         if (ImGui::Button("Print scenesVisited")) {
             auto pScenesVisited = *pPlayerData->scenesVisited();
             std::cout << pScenesVisited << '\n';
-            std::cout << "_items : " << pScenesVisited->_items << ' ' << & pScenesVisited->_items << '\n';
-            std::cout << "_size : " << pScenesVisited->_size << ' ' << & pScenesVisited->_size << '\n';
+            std::cout << "_items : " << pScenesVisited->_items << ' ' << &pScenesVisited->_items << '\n';
+            std::cout << "_size : " << pScenesVisited->_size << ' ' << &pScenesVisited->_size << '\n';
             String** items = pScenesVisited->_items->vector;
+            std::cout << items << '\n';
 
             for (int i = 0; i < pScenesVisited->_size; i++) {
                 std::wcout << items[i]->chars << '\n';
             }
-
         }
+        Vector3 pos = pTransform->get_position();
+        ImGui::Text("%f %f %f", pos.x, pos.y, pos.z);
     }
     ImGui::End();
 }

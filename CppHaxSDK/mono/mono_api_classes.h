@@ -13,8 +13,14 @@ struct MonoString;
 struct MonoVTable;
 struct MonoArray;
 struct MonoThreadsSync;
+struct MonoJitInfo;
+struct MonoError;
 
 struct MonoObject {
+protected:
+    static void* GetStaticField(MonoClass*& klass, const char* assemblyName, const char* name_space, const char* klassName, const char* fieldName);
+    int GetFieldOffset(MonoClass*& klass, const char* fieldName);
+public:
     MonoVTable* vtable;
     MonoThreadsSync* synchronisation;
 };
@@ -23,7 +29,7 @@ struct MonoClassField {
     MonoType* type;
     const char* name;
     MonoClass* parent;
-    int         offset;
+    int offset;
 };
 
 typedef struct {
@@ -45,16 +51,16 @@ struct String {
 
 template <class T>
 struct Array {
-    MonoObject obj;
+    MonoObject object;
     MonoArrayBounds* bounds;
-    uint64_t max_length;
-    __declspec(align(8)) T vector[32];
+    int max_length;
+    T vector[32];
 };
 
 template <class T>
 struct List {
     MonoObject object;
-    Array<T*>* _items;
+    Array<T>* _items;
     int32_t _size;
     int32_t _version;
     void* _syncRoot;
