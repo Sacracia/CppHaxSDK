@@ -1,12 +1,8 @@
 #pragma once
 
-#include "mono_api_classes.h"
+#include <stdint.h>
 
-struct Vector3 {
-    float x;
-    float y;
-    float z;
-};
+#include "mono_api_classes.h"
 
 class PlayerData;
 
@@ -25,4 +21,5 @@ public:
 public:
     bool* infiniteAirJump();
     bool* isInvincible();
+    List<String>** scenesVisited();
 };

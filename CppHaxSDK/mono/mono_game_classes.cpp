@@ -27,3 +27,8 @@ bool* PlayerData::isInvincible() {
     static int offset = mono::GetFieldOffset(klass, this, "isInvincible");
     return (bool*)((char*)this + offset);
 }
+
+List<String>** PlayerData::scenesVisited() {
+    static int offset = mono::GetFieldOffset(klass, this, "scenesVisited");
+    return (List<String>**)((char*)this + offset);
+}

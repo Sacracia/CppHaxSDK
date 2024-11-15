@@ -1,6 +1,7 @@
 #include "user.h"
 
 #include <string>
+#include <iostream>
 
 #include "third_party/imgui/imgui.h"
 
@@ -26,11 +27,25 @@ void RenderMenu(bool*) {
         if (ImGui::Button("+100 Geo")) {
             HeroController_AddGeo(pHeroController, 100);
         }
+        ImGui::SameLine();
         if (ImGui::Button("+1000 Geo")) {
             HeroController_AddGeo(pHeroController, 1000);
         }
+        ImGui::SameLine();
         if (ImGui::Button("+10000 Geo")) {
             HeroController_AddGeo(pHeroController, 10000);
+        }
+        if (ImGui::Button("Print scenesVisited")) {
+            auto pScenesVisited = *pPlayerData->scenesVisited();
+            std::cout << pScenesVisited << '\n';
+            std::cout << "_items : " << pScenesVisited->_items << ' ' << & pScenesVisited->_items << '\n';
+            std::cout << "_size : " << pScenesVisited->_size << ' ' << & pScenesVisited->_size << '\n';
+            String** items = pScenesVisited->_items->vector;
+
+            for (int i = 0; i < pScenesVisited->_size; i++) {
+                std::wcout << items[i]->chars << '\n';
+            }
+
         }
     }
     ImGui::End();

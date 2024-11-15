@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 struct MonoThread;
 struct MonoDomain;
 struct MonoAssembly;
@@ -10,8 +12,11 @@ struct MonoMethod;
 struct MonoString;
 struct MonoVTable;
 struct MonoArray;
+struct MonoThreadsSync;
 
 struct MonoObject {
+    MonoVTable* vtable;
+    MonoThreadsSync* synchronisation;
 };
 
 struct MonoClassField {
@@ -19,4 +24,38 @@ struct MonoClassField {
     const char* name;
     MonoClass* parent;
     int         offset;
+};
+
+typedef struct {
+    uint64_t length;
+    int64_t lower_bound;
+} MonoArrayBounds;
+
+struct Vector3 {
+    float x;
+    float y;
+    float z;
+};
+
+struct String {
+    MonoObject object;
+    int32_t length;
+    wchar_t chars[32];
+};
+
+template <class T>
+struct Array {
+    MonoObject obj;
+    MonoArrayBounds* bounds;
+    uint64_t max_length;
+    __declspec(align(8)) T vector[32];
+};
+
+template <class T>
+struct List {
+    MonoObject object;
+    Array<T*>* _items;
+    int32_t _size;
+    int32_t _version;
+    void* _syncRoot;
 };

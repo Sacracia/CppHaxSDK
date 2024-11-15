@@ -12,7 +12,7 @@ static void Start() {
 	LOG_INIT(DEBUG, true);
 	mono::Initialize();
 
-    hooks::SetupHooks();
+    //hooks::SetupHooks();
 
     ImplementationDetails details;
     details.ApplyStyleProc = ApplyStyle;
