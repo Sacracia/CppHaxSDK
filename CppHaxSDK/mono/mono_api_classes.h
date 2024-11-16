@@ -17,9 +17,7 @@ struct MonoJitInfo;
 struct MonoError;
 
 struct MonoObject {
-protected:
-    static void* GetStaticField(MonoClass*& klass, const char* assemblyName, const char* name_space, const char* klassName, const char* fieldName);
-    int GetFieldOffset(MonoClass*& klass, const char* fieldName);
+    MonoMethod* GetMonoMethod(void* addr);
 public:
     MonoVTable* vtable;
     MonoThreadsSync* synchronisation;

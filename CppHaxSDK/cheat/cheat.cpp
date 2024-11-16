@@ -7,10 +7,51 @@
 #include "hooks/hooks.h"
 #include "../third_party/imgui/imgui.h"
 
-#define MONO_GAME_FUNC(r, n, p, s) r(*n)p
+namespace hero_controller {
+    namespace static_fields {
+        void* _instance;
+    }
+
+    namespace offsets {
+        int playerData;
+        int transform;
+    }
+
+    namespace funcs {
+        void(*HeroController_AddGeo)(MonoObject* __this, int amount);
+        void(*HeroController_Update)(MonoObject* __this);
+    }
+}
+
+namespace player_data {
+    namespace static_fields {
+        void* _instance;
+    }
+
+    namespace offsets {
+        int infiniteAirJump;
+        int isInvincible;
+        int scenesVisited;
+    }
+
+    namespace funcs {
+        int32_t(*PlayerData_getCurrentMaxHealth)(MonoObject* __this);
+    }
+}
+
+namespace transform {
+    namespace funcs {
+        MonoObject* (*Transform_getPosition)(MonoObject* __this);
+    }
+}
+
+namespace cheat_manager {
+    namespace funcs {
+        bool(*CheatManager_getIsInstaKillEnabled)(MonoObject* __this);
+    }
+}
+
 #include "game/game_classes.h"
-#include "game/game_functions.h"
-#undef MONO_GAME_FUNC
 
 struct ImplementationDetails {
     void(*ApplyStyleProc)();
@@ -22,52 +63,78 @@ bool isInstaKill;
 bool isInvincible;
 
 static ImVec4 HexToColor(std::string hex_string);
-static void InitGameFunctions();
+static void InitGameData();
 static void RenderMenu(bool*);
 static void ApplyStyle();
 
 void cheat::Initialize() {
-    InitGameFunctions();
+    InitGameData();
     hooks::SetupHooks();
 
     details.ApplyStyleProc = ApplyStyle;
     details.DrawMenuProc = RenderMenu;
 }
 
-static void InitGameFunctions() {
-#define MONO_GAME_FUNC(r, n, p, s)                          \
-        n = (r(*)p)mono::GetFuncAddress(s);                 \
-        std::cout << #n " address is " << n << '\n';        \
-        assert(n && #n " not found")
-#include "game/game_functions.h"
-#undef MONO_GAME_FUNC
+static void InitGameData() {
+#define MONO_ASSEMBLY   "Assembly-CSharp"
+#define MONO_NAMESPACE  ""
+
+#define MONO_CLASS      "HeroController"
+    hero_controller::static_fields::_instance = mono::GetStaticFieldAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "_instance");
+    hero_controller::offsets::playerData = mono::GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "playerData");
+    hero_controller::offsets::transform = mono::GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "transform");
+    hero_controller::funcs::HeroController_AddGeo = (void(*)(MonoObject*, int))mono::GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "AddGeo (int)");
+    hero_controller::funcs::HeroController_Update = (void(*)(MonoObject*))mono::GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "Update ()");
+#undef MONO_CLASS
+#define MONO_CLASS      "PlayerData"
+    player_data::static_fields::_instance = mono::GetStaticFieldAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "_instance");
+    player_data::offsets::infiniteAirJump = mono::GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "infiniteAirJump");
+    player_data::offsets::isInvincible = mono::GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "isInvincible");
+    player_data::offsets::scenesVisited = mono::GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "scenesVisited");
+    player_data::funcs::PlayerData_getCurrentMaxHealth = (int32_t(*)(MonoObject*))mono::GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "get_CurrentMaxHealth ()");
+#undef MONO_CLASS
+#define MONO_CLASS      "CheatManager"
+    cheat_manager::funcs::CheatManager_getIsInstaKillEnabled = (bool(*)(MonoObject*))mono::GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "get_IsInstaKillEnabled ()");
+#undef MONO_CLASS
+
+#undef MONO_NAMESPACE
+#undef MONO_ASSEMBLY
+
+
+#define MONO_ASSEMBLY   "UnityEngine.CoreModule"
+#define MONO_NAMESPACE  "UnityEngine"
+#define MONO_CLASS      "Transform"
+    transform::funcs::Transform_getPosition = (MonoObject*(*)(MonoObject*))mono::GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "get_position ()");
+#undef MONO_ASSEMBLY
+#undef MONO_NAMESPACE
+#undef MONO_CLASS
 }
 
 static void RenderMenu(bool*) {
-    HeroController* pHeroController = *HeroController::_instance();
+    HeroController* pHeroController = HeroController::_instance();
 
     ImGui::SetNextWindowBgAlpha(1);
     ImGui::Begin("Menu", NULL);
     if (pHeroController) {
-        PlayerData* pPlayerData = *pHeroController->playerData();
-        Transform* pTransform = *pHeroController->transform();
+        PlayerData* pPlayerData = pHeroController->playerData();
+        Transform* pTransform = pHeroController->transform();
 
-        ImGui::Checkbox("Infinite Air Jump", pPlayerData->infiniteAirJump());
+        ImGui::Checkbox("Infinite Air Jump", &pPlayerData->infiniteAirJump());
         ImGui::Checkbox("InstaKill", &isInstaKill);
         ImGui::Checkbox("Invincible", &isInvincible);
         if (ImGui::Button("+100 Geo")) {
-            HeroController_AddGeo(pHeroController, 100);
+            pHeroController->AddGeo(100);
         }
         ImGui::SameLine();
         if (ImGui::Button("+1000 Geo")) {
-            HeroController_AddGeo(pHeroController, 1000);
+            pHeroController->AddGeo(1000);
         }
         ImGui::SameLine();
         if (ImGui::Button("+10000 Geo")) {
-            HeroController_AddGeo(pHeroController, 10000);
+            pHeroController->AddGeo(10000);
         }
         if (ImGui::Button("Print scenesVisited")) {
-            auto pScenesVisited = *pPlayerData->scenesVisited();
+            auto pScenesVisited = pPlayerData->scenesVisited();
             std::cout << pScenesVisited << '\n';
             std::cout << "_items : " << pScenesVisited->_items << ' ' << &pScenesVisited->_items << '\n';
             std::cout << "_size : " << pScenesVisited->_size << ' ' << &pScenesVisited->_size << '\n';

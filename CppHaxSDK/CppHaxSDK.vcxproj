@@ -164,6 +164,7 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x64;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories);$(SolutionDir)CppHaxSDK\logger;$(SolutionDir)CppHaxSDK\gui</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -179,6 +180,7 @@
   <ItemGroup>
     <ClInclude Include="cheat\cheat.h" />
     <ClInclude Include="cheat\game\game_classes.h" />
+    <ClInclude Include="cheat\game\game_data.h" />
     <ClInclude Include="cheat\hooks\hooks.h" />
     <ClInclude Include="gui\gui.h" />
     <ClInclude Include="logger\logger.h" />
