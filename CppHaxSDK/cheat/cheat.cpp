@@ -3,111 +3,32 @@
 #include <iostream>
 #include <assert.h>
 
-#include "../mono/mono_sdk.h"
-#include "hooks/hooks.h"
 #include "../third_party/imgui/imgui.h"
+#include "../gui/gui.h"
+#include "hooks/hooks.h"
 
-namespace hero_controller {
-    namespace static_fields {
-        void* _instance;
-    }
-
-    namespace offsets {
-        int playerData;
-        int transform;
-    }
-
-    namespace funcs {
-        void(*HeroController_AddGeo)(MonoObject* __this, int amount);
-        void(*HeroController_Update)(MonoObject* __this);
-    }
-}
-
-namespace player_data {
-    namespace static_fields {
-        void* _instance;
-    }
-
-    namespace offsets {
-        int infiniteAirJump;
-        int isInvincible;
-        int scenesVisited;
-    }
-
-    namespace funcs {
-        int32_t(*PlayerData_getCurrentMaxHealth)(MonoObject* __this);
-    }
-}
-
-namespace transform {
-    namespace funcs {
-        MonoObject* (*Transform_getPosition)(MonoObject* __this);
-    }
-}
-
-namespace cheat_manager {
-    namespace funcs {
-        bool(*CheatManager_getIsInstaKillEnabled)(MonoObject* __this);
-    }
-}
-
-#include "game/game_classes.h"
-
-struct ImplementationDetails {
-    void(*ApplyStyleProc)();
-    void(*DrawMenuProc)(bool*); // bool* added to be compatible with ImGui::ShowDemoWindow
-};
+#define MONO_API_FUNC(r, n, p)          extern r(*n)p
+#define MONO_STATIC_FIELD(n, r, c)      extern r c ## _ ## n
+#define MONO_FIELD_OFFSET(n, c)         extern int c ## _ ## n
+#define MONO_GAME_FUNC(r, n, p, c, s)   extern r(__fastcall *c ## _ ## n)p
+#include "../mono/mono_api_classes.h"
+#include "../mono/mono_api_functions.h"
+#include "../mono/mono_game_data.h"
 
 extern ImplementationDetails details;
 bool isInstaKill;
 bool isInvincible;
 
 static ImVec4 HexToColor(std::string hex_string);
-static void InitGameData();
 static void RenderMenu(bool*);
 static void ApplyStyle();
 
 void cheat::Initialize() {
-    InitGameData();
     hooks::SetupHooks();
 
+    details.api = Dx11;
     details.ApplyStyleProc = ApplyStyle;
     details.DrawMenuProc = RenderMenu;
-}
-
-static void InitGameData() {
-#define MONO_ASSEMBLY   "Assembly-CSharp"
-#define MONO_NAMESPACE  ""
-
-#define MONO_CLASS      "HeroController"
-    hero_controller::static_fields::_instance = mono::GetStaticFieldAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "_instance");
-    hero_controller::offsets::playerData = mono::GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "playerData");
-    hero_controller::offsets::transform = mono::GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "transform");
-    hero_controller::funcs::HeroController_AddGeo = (void(*)(MonoObject*, int))mono::GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "AddGeo (int)");
-    hero_controller::funcs::HeroController_Update = (void(*)(MonoObject*))mono::GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "Update ()");
-#undef MONO_CLASS
-#define MONO_CLASS      "PlayerData"
-    player_data::static_fields::_instance = mono::GetStaticFieldAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "_instance");
-    player_data::offsets::infiniteAirJump = mono::GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "infiniteAirJump");
-    player_data::offsets::isInvincible = mono::GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "isInvincible");
-    player_data::offsets::scenesVisited = mono::GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "scenesVisited");
-    player_data::funcs::PlayerData_getCurrentMaxHealth = (int32_t(*)(MonoObject*))mono::GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "get_CurrentMaxHealth ()");
-#undef MONO_CLASS
-#define MONO_CLASS      "CheatManager"
-    cheat_manager::funcs::CheatManager_getIsInstaKillEnabled = (bool(*)(MonoObject*))mono::GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "get_IsInstaKillEnabled ()");
-#undef MONO_CLASS
-
-#undef MONO_NAMESPACE
-#undef MONO_ASSEMBLY
-
-
-#define MONO_ASSEMBLY   "UnityEngine.CoreModule"
-#define MONO_NAMESPACE  "UnityEngine"
-#define MONO_CLASS      "Transform"
-    transform::funcs::Transform_getPosition = (MonoObject*(*)(MonoObject*))mono::GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, MONO_CLASS, "get_position ()");
-#undef MONO_ASSEMBLY
-#undef MONO_NAMESPACE
-#undef MONO_CLASS
 }
 
 static void RenderMenu(bool*) {

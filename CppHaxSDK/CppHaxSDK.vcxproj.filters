@@ -90,22 +90,22 @@
     <ClInclude Include="mono\mono_api_classes.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="cheat\game\game_functions.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="cheat\hooks\hooks.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="cheat\cheat.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="cheat\game\game_classes.h">
+    <ClInclude Include="mono\mono_game_data.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="mono\mono_sdk.h">
+    <ClInclude Include="mono\mono_game_offsets.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="cheat\game\game_data.h">
+    <ClInclude Include="mono\mono_game_static_fields.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="mono\mono_game_functions.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -162,9 +162,6 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="cheat\cheat.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="cheat\game\game_classes.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

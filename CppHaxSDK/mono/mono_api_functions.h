@@ -30,4 +30,5 @@ MONO_API_FUNC(void*,            mono_object_unbox, (MonoObject* obj));
 // field
 MONO_API_FUNC(void*,            mono_vtable_get_static_field_data, (MonoVTable* vt));
 
+#undef MONO_API_FUNC
 #endif

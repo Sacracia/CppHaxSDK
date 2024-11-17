@@ -179,15 +179,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="cheat\cheat.h" />
-    <ClInclude Include="cheat\game\game_classes.h" />
-    <ClInclude Include="cheat\game\game_data.h" />
     <ClInclude Include="cheat\hooks\hooks.h" />
     <ClInclude Include="gui\gui.h" />
     <ClInclude Include="logger\logger.h" />
     <ClInclude Include="mono\mono.h" />
     <ClInclude Include="mono\mono_api_classes.h" />
     <ClInclude Include="mono\mono_api_functions.h" />
-    <ClInclude Include="mono\mono_sdk.h" />
+    <ClInclude Include="mono\mono_game_data.h" />
+    <ClInclude Include="mono\mono_game_functions.h" />
+    <ClInclude Include="mono\mono_game_offsets.h" />
+    <ClInclude Include="mono\mono_game_static_fields.h" />
     <ClInclude Include="third_party\detours\x64\detours.h" />
     <ClInclude Include="third_party\detours\x64\detver.h" />
     <ClInclude Include="third_party\detours\x64\syelog.h" />
@@ -208,10 +209,8 @@
     <ClInclude Include="third_party\imgui\imstb_rectpack.h" />
     <ClInclude Include="third_party\imgui\imstb_textedit.h" />
     <ClInclude Include="third_party\imgui\imstb_truetype.h" />
-    <ClInclude Include="cheat\game\game_functions.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cheat\game\game_classes.cpp" />
     <ClCompile Include="cheat\hooks\hooks.cpp" />
     <ClCompile Include="cheat\cheat.cpp" />
     <ClCompile Include="dllmain.cpp" />

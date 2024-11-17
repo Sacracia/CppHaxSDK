@@ -184,19 +184,19 @@ void haxsdk::ImplementImGui(ImplementationDetails& details) {
         do {
             std::string moduleName(me.szModule);
             std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
-            if (moduleName == "opengl32.dll") {
+            if (moduleName == "opengl32.dll" && g_details.api == All) {
                 opengl::Hook();
             }
-            if (moduleName == "d3d9.dll") {
+            if (moduleName == "d3d9.dll" && g_details.api == All) {
                 dx9::Hook();
             }
-            if (moduleName == "d3d10.dll") {
+            if (moduleName == "d3d10.dll" && g_details.api == All) {
                 dx10::Setup();
             }
-            if (moduleName == "d3d11.dll") {
+            if (moduleName == "d3d11.dll" && (g_details.api == All || (g_details.api & Dx11))) {
                 dx11::Setup();
             }
-            if (moduleName == "d3d12.dll") {
+            if (moduleName == "d3d12.dll" && (g_details.api == All || (g_details.api & Dx12))) {
                 dx12::Setup();
             }
             if (moduleName == "vulkan-1.dll") {
@@ -228,17 +228,17 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
          ID3D11Device* pDevice11;
          ID3D12Device* pDevice12;
          DetourTransactionBegin();
-         if (pSwapChain->GetDevice(__uuidof(pDevice10), (void**)&pDevice10) == S_OK) {
+         if (g_details.api == All && pSwapChain->GetDevice(__uuidof(pDevice10), (void**)&pDevice10) == S_OK) {
              LOG_INFO << "GAME USES DIRECTX10" << LOG_FLUSH;
              graphics = GraphicsAPI::D3D10;
              DetourAttach(&(PVOID&)oResizeBuffers, dx10::HookedResizeBuffers);
          }
-         else if (pSwapChain->GetDevice(__uuidof(pDevice11), (void**)&pDevice11) == S_OK) {
+         else if ((g_details.api == All || (g_details.api & Dx11)) && pSwapChain->GetDevice(__uuidof(pDevice11), (void**)&pDevice11) == S_OK) {
              LOG_INFO << "GAME USES DIRECTX11" << LOG_FLUSH;
              graphics = GraphicsAPI::D3D11;
              DetourAttach(&(PVOID&)oResizeBuffers, dx11::HookedResizeBuffers);
          }
-         else if (pSwapChain->GetDevice(__uuidof(pDevice12), (void**)&pDevice12) == S_OK) {
+         else if ((g_details.api == All || (g_details.api & Dx12)) && pSwapChain->GetDevice(__uuidof(pDevice12), (void**)&pDevice12) == S_OK) {
              LOG_INFO << "GAME USES DIRECTX12" << LOG_FLUSH;
              graphics = GraphicsAPI::D3D12;
              DetourAttach(&(PVOID&)oResizeBuffers, dx12::HookedResizeBuffers);
