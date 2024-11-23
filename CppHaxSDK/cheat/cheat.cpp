@@ -15,12 +15,67 @@
 #include "../mono/mono_api_functions.h"
 #include "../mono/mono_game_data.h"
 
+class Spell1 {
+public:
+    int backField;
+
+    int Get() {
+        PlayerData* pPlayerData = PlayerData::_instance();
+        return pPlayerData->hasSpell() ? pPlayerData->fireballLevel() : 0;
+    }
+
+    void Set(int value) {
+        PlayerData* pPlayerData = PlayerData::_instance();
+        if (value > 0)
+            pPlayerData->hasSpell() = true;
+        pPlayerData->fireballLevel() = value;
+    }
+};
+
+class Spell2 {
+public:
+    int Get() {
+        PlayerData* pPlayerData = PlayerData::_instance();
+        return pPlayerData->hasSpell() ? pPlayerData->quakeLevel() : 0;
+    }
+
+    void Set(int value) {
+        PlayerData* pPlayerData = PlayerData::_instance();
+        if (value > 0)
+            pPlayerData->hasSpell() = true;
+        pPlayerData->quakeLevel() = value;
+    }
+};
+
+class Spell3 {
+public:
+    int Get() {
+        PlayerData* pPlayerData = PlayerData::_instance();
+        return pPlayerData->hasSpell() ? pPlayerData->screamLevel() : 0;
+    }
+
+    void Set(int value) {
+        PlayerData* pPlayerData = PlayerData::_instance();
+        if (value > 0)
+            pPlayerData->hasSpell() = true;
+        pPlayerData->screamLevel() = value;
+    }
+};
+
 extern ImplementationDetails details;
 bool isInstaKill;
 bool isInvincible;
+bool isFastAttack;
+bool isInfiniteDash;
+bool isInfiniteSoul;
+float speedMultiplier = 1.;
+int geoMultiplier = 1;
 
-static ImVec4 HexToColor(std::string hex_string);
 static void RenderMenu(bool*);
+static void RenderHeroTab();
+static void RenderMapTab();
+static void RenderPowerUpsTab();
+static ImVec4 HexToColor(std::string hex_string);
 static void ApplyStyle();
 
 void cheat::Initialize() {
@@ -32,11 +87,14 @@ void cheat::Initialize() {
 }
 
 static void RenderMenu(bool*) {
-    HeroController* pHeroController = HeroController::_instance();
-
     ImGui::SetNextWindowBgAlpha(1);
     ImGui::Begin("Menu", NULL);
-    if (pHeroController) {
+    ImGui::BeginTabBar("#TopBar", ImGuiTabBarFlags_NoTabListScrollingButtons);
+    RenderHeroTab();
+    RenderMapTab();
+    RenderPowerUpsTab();
+    ImGui::EndTabBar();
+    /*if (pHeroController) {
         PlayerData* pPlayerData = pHeroController->playerData();
         Transform* pTransform = pHeroController->transform();
 
@@ -68,8 +126,163 @@ static void RenderMenu(bool*) {
         }
         Vector3 pos = pTransform->get_position();
         ImGui::Text("%f %f %f", pos.x, pos.y, pos.z);
-    }
+    }*/
     ImGui::End();
+}
+
+static void RenderHeroTab() {
+    if (ImGui::BeginTabItem("Hero")) {
+        HeroController* pHeroController = HeroController::_instance();
+        if (pHeroController) {
+            PlayerData* pPlayerData = pHeroController->playerData();
+            ImGui::SeparatorText("HEALTH");
+            ImGui::Checkbox("Invincible", &isInvincible);
+            if (ImGui::Button("Restore health")) {
+                pHeroController->MaxHealth();
+            }
+
+            ImGui::SeparatorText("DAMAGE");
+            ImGui::Checkbox("Insta kill", &isInstaKill);
+            ImGui::Checkbox("Fast attacks", &isFastAttack);
+
+            ImGui::SeparatorText("MOVEMENT");
+            ImGui::SliderFloat("Speed multiplier", &speedMultiplier, 1., 5., "%.1f");
+            ImGui::Checkbox("Infinite jumps", &pPlayerData->infiniteAirJump());
+            ImGui::Checkbox("Infinite dash", &isInfiniteDash);
+            // has dash skipped
+            ImGui::SliderFloat("Dash distance", &pHeroController->DASH_SPEED(), 0., 80., "%.1f");
+
+            ImGui::SeparatorText("GEO");
+            if (ImGui::Button("+100 geo"))
+                pHeroController->AddGeo(100);
+            ImGui::SameLine();
+            if (ImGui::Button("+1000 geo"))
+                pHeroController->AddGeo(1000);
+            ImGui::SameLine();
+            if (ImGui::Button("+10000 geo"))
+                pHeroController->AddGeo(10000);
+            ImGui::SliderInt("Geo multiplier", &geoMultiplier, 1, 10);
+
+            ImGui::SeparatorText("MISC");
+            ImGui::Checkbox("Infinite soul", &isInfiniteSoul);
+            float timeScale = game::funcs::Time_get_timeScale(nullptr);
+            float timeScaleCopy = timeScale;
+            ImGui::SliderFloat("Time scale", &timeScale, 1., 4., "%.1f");
+            if (timeScale != timeScaleCopy)
+                game::funcs::Time_set_timeScale(timeScale);
+        }
+        ImGui::EndTabItem();
+    }
+}
+
+static void RenderMapTab() {
+    if (ImGui::BeginTabItem("Map")) {
+        HeroController* pHeroController = HeroController::_instance();
+        if (pHeroController) {
+            PlayerData* pPlayerData = pHeroController->playerData();
+            ImGui::SeparatorText("UNLOCKABLE");
+            ImGui::Checkbox("Has map", &pPlayerData->hasMap());
+            ImGui::Checkbox("Mapper shop", &pPlayerData->openedMapperShop());
+            ImGui::Checkbox("Has quill", &pPlayerData->hasQuill());
+            ImGui::Checkbox("Has compass", &pPlayerData->gotCharm_2());
+
+            ImGui::SeparatorText("REGIONS");
+            ImGui::Checkbox("Dirtmouth", &pPlayerData->mapDirtmouth());
+            ImGui::Checkbox("Crossroads", &pPlayerData->mapCrossroads());
+            ImGui::Checkbox("Greenpath", &pPlayerData->mapGreenpath());
+            ImGui::Checkbox("FogCanyon", &pPlayerData->mapFogCanyon());
+            ImGui::Checkbox("Royal Gardens", &pPlayerData->mapRoyalGardens());
+            ImGui::Checkbox("Fungal Wastes", &pPlayerData->mapFungalWastes());
+            ImGui::Checkbox("City", &pPlayerData->mapCity());
+            ImGui::Checkbox("Waterways", &pPlayerData->mapWaterways());
+            ImGui::Checkbox("Mines", &pPlayerData->mapMines());
+            ImGui::Checkbox("Deepnest", &pPlayerData->mapDeepnest());
+            ImGui::Checkbox("Cliffs", &pPlayerData->mapCliffs());
+            ImGui::Checkbox("Outskirts", &pPlayerData->mapOutskirts());
+            ImGui::Checkbox("Resting Grounds", &pPlayerData->mapRestingGrounds());
+            ImGui::Checkbox("Abyss", &pPlayerData->mapAbyss());
+
+            ImGui::SeparatorText("PINS");
+            ImGui::Checkbox("Has pin", &pPlayerData->hasPin());
+            ImGui::Checkbox("Bench", &pPlayerData->hasPinBench());
+            ImGui::Checkbox("Cocoon", &pPlayerData->hasPinCocoon());
+            ImGui::Checkbox("Dream plant", &pPlayerData->hasPinDreamPlant());
+            ImGui::Checkbox("Guardian", &pPlayerData->hasPinGuardian());
+            ImGui::Checkbox("Black egg", &pPlayerData->hasPinBlackEgg());
+            ImGui::Checkbox("Shop", &pPlayerData->hasPinShop());
+            ImGui::Checkbox("Spa", &pPlayerData->hasPinSpa());
+            ImGui::Checkbox("Stag", &pPlayerData->hasPinStag());
+            ImGui::Checkbox("Tram", &pPlayerData->hasPinTram());
+            ImGui::Checkbox("Ghost", &pPlayerData->hasPinGhost());
+            ImGui::Checkbox("Grub", &pPlayerData->hasPinGrub());
+        }
+        ImGui::EndTabItem();
+    }
+}
+
+static void RenderPowerUpsTab() {
+    static const char* spell3Levels[3] = { "Locked", "Howling Wraiths", "Abyss Shriek" };
+
+    if (ImGui::BeginTabItem("Powerups")) {
+        HeroController* pHeroController = HeroController::_instance();
+        if (pHeroController) {
+            static const char* spell1Levels[3] = { "Locked", "Vengeful Spirit", "Shade Soul" };
+            Spell1 spell1;
+            int selected = spell1.Get();
+            if (ImGui::BeginCombo("Spell1", spell1Levels[selected]))
+            {
+                for (int n = 0; n < 3; n++)
+                {
+                    const int selected = spell1.Get();
+                    const bool isSelected = (selected == n);
+                    if (ImGui::Selectable(spell1Levels[n], isSelected))
+                        spell1.Set(n);
+
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            static const char* spell2Levels[3] = { "Locked", "Desolate Dive", "Descending Dark" };
+            Spell2 spell2;
+            selected = spell2.Get();
+            if (ImGui::BeginCombo("Spell2", spell2Levels[selected]))
+            {
+                for (int n = 0; n < 3; n++)
+                {
+                    const int selected = spell2.Get();
+                    const bool isSelected = (selected == n);
+                    if (ImGui::Selectable(spell2Levels[n], isSelected))
+                        spell2.Set(n);
+
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            static const char* spell3Levels[3] = { "Locked", "Howling Wraiths", "Abyss Shriek" };
+            Spell3 spell3;
+            selected = spell3.Get();
+            if (ImGui::BeginCombo("Spell3", spell3Levels[selected]))
+            {
+                for (int n = 0; n < 3; n++)
+                {
+                    const int selected = spell3.Get();
+                    const bool isSelected = (selected == n);
+                    if (ImGui::Selectable(spell3Levels[n], isSelected))
+                        spell3.Set(n);
+
+                    if (isSelected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+        }
+        ImGui::EndTabItem();
+    }
 }
 
 void ApplyStyle() {

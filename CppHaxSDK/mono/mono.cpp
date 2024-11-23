@@ -57,15 +57,13 @@ namespace mono {
 
     static void InitGameData() {
         #define MONO_STATIC_FIELD(n, r, c)                                                                                    \
-            game::static_fields:: ## c ## _ ## n = (r)(GetStaticFieldAddress(MONO_ASSEMBLY, MONO_NAMESPACE, #c, #n));   \
-            std::cout << #c "_" #n << ' ' << game::static_fields:: ## c ## _ ## n << '\n';\
+            game::static_fields:: ## c ## _ ## n = (r)(GetStaticFieldAddress(MONO_ASSEMBLY, MONO_NAMESPACE, #c, #n));         \
             assert(game::static_fields:: ## c ## _ ## n)
         #define MONO_FIELD_OFFSET(n, c)                                                                                       \
-            game::offsets:: ## c ## _ ## n =  GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, #c, #n);                    \
-            std::cout << std::hex << #c "_" #n << ' ' << game::offsets:: ## c ## _ ## n << '\n';\
+            game::offsets:: ## c ## _ ## n =  GetFieldOffset(MONO_ASSEMBLY, MONO_NAMESPACE, #c, #n);                          \
             assert(game::offsets:: ## c ## _ ## n)
         #define MONO_GAME_FUNC(r, n, p, c, s)                                                                                 \
-            game::funcs:: ## c ## _ ## n = (r(__fastcall*)p)GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, #c, s);                 \
+            game::funcs:: ## c ## _ ## n = (r(__fastcall*)p)GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, #c, s);             \
             std::cout << #c "_" #n << ' ' << game::funcs:: ## c ## _ ## n << '\n';\
             assert(game::funcs:: ## c ## _ ## n)
         #include "mono_game_functions.h"

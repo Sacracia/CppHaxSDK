@@ -17,6 +17,9 @@ struct MonoJitInfo;
 struct MonoError;
 
 struct MonoObject {
+private:
+    MonoObject();
+public:
     MonoMethod* GetMonoMethod(void* addr);
 public:
     MonoVTable* vtable;
