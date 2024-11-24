@@ -64,7 +64,7 @@ namespace mono {
             assert(game::offsets:: ## c ## _ ## n)
         #define MONO_GAME_FUNC(r, n, p, c, s)                                                                                 \
             game::funcs:: ## c ## _ ## n = (r(__fastcall*)p)GetFuncAddress(MONO_ASSEMBLY, MONO_NAMESPACE, #c, s);             \
-            std::cout << #c "_" #n << ' ' << game::funcs:: ## c ## _ ## n << '\n';\
+            LOG_DEBUG << #c "_" #n << ' ' << game::funcs:: ## c ## _ ## n << LOG_FLUSH;\
             assert(game::funcs:: ## c ## _ ## n)
         #include "mono_game_functions.h"
         #include "mono_game_offsets.h"
@@ -124,12 +124,10 @@ namespace mono {
         while (method = mono_class_get_methods(klass, &iter)) {
             if (strcmp(sig,mono_method_full_name(method, 1)) == 0) {
                 void* addr = mono_compile_method(method);
-                std::cout << methodSig << ' ' << addr << '\n';
                 return addr;
             }
         }
 
-        std::cout << sig << ' ' << 0 << '\n';
         return nullptr;
     }
 

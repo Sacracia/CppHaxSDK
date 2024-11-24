@@ -18,7 +18,7 @@ MONO_GAME_FUNC(void, Update, (HeroController* __this), HeroController, "Update (
 
 MONO_GAME_FUNC(void, AddGeo, (HeroController* __this, int amount), HeroController, "AddGeo (int)");
 MONO_GAME_FUNC(void, Update, (HeroController* __this), HeroController, "Update ()");
-MONO_GAME_FUNC(void, MaxHealth, (HeroController* __this), HeroController, "MaxHealth ()");  
+MONO_GAME_FUNC(void, AddHealth, (HeroController* __this, int amount), HeroController, "AddHealth (int)");
 MONO_GAME_FUNC(bool, CanAttack, (HeroController* __this), HeroController, "CanAttack ()");
 MONO_GAME_FUNC(void, Move, (HeroController* __this, float moveDirection), HeroController, "Move (single)");
 MONO_GAME_FUNC(bool, CanDash, (HeroController* __this), HeroController, "CanDash ()");

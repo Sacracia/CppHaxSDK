@@ -1,11 +1,15 @@
 #include "cheat.h"
 
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 #include <iostream>
 #include <assert.h>
+#include <cmath>
 
 #include "../third_party/imgui/imgui.h"
 #include "../gui/gui.h"
 #include "hooks/hooks.h"
+#include "../logger/logger.h"
 
 #define MONO_API_FUNC(r, n, p)          extern r(*n)p
 #define MONO_STATIC_FIELD(n, r, c)      extern r c ## _ ## n
@@ -14,6 +18,34 @@
 #include "../mono/mono_api_classes.h"
 #include "../mono/mono_api_functions.h"
 #include "../mono/mono_game_data.h"
+
+class HasDash {
+public:
+    bool Get() {
+        PlayerData* pPlayerData = PlayerData::_instance();
+        return pPlayerData->hasDash() && pPlayerData->canDash();
+    }
+
+    void Set(bool value) {
+        PlayerData* pPlayerData = PlayerData::_instance();
+        pPlayerData->hasDash() = pPlayerData->canDash() = value;
+    }
+};
+
+class HasShadowDash {
+public:
+    bool Get() {
+        PlayerData* pPlayerData = PlayerData::_instance();
+        return pPlayerData->hasDash() && pPlayerData->canDash() && pPlayerData->hasShadowDash() && pPlayerData->canShadowDash();
+    }
+
+    void Set(bool value) {
+        PlayerData* pPlayerData = PlayerData::_instance();
+        pPlayerData->hasShadowDash() = pPlayerData->canShadowDash() = value;
+        if (value)
+            pPlayerData->hasDash() = pPlayerData->canDash() = true;
+    }
+};
 
 class Spell1 {
 public:
@@ -81,52 +113,20 @@ static void ApplyStyle();
 void cheat::Initialize() {
     hooks::SetupHooks();
 
-    details.api = Dx11;
+    details.api = Dx11 | Dx12;
     details.ApplyStyleProc = ApplyStyle;
     details.DrawMenuProc = RenderMenu;
 }
 
 static void RenderMenu(bool*) {
+    ImGui::SetNextWindowSize(ImVec2(400, 550), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowBgAlpha(1);
-    ImGui::Begin("Menu", NULL);
+    ImGui::Begin("Hollow Knight Cheat Menu [by Sacracia]", NULL);
     ImGui::BeginTabBar("#TopBar", ImGuiTabBarFlags_NoTabListScrollingButtons);
     RenderHeroTab();
     RenderMapTab();
     RenderPowerUpsTab();
     ImGui::EndTabBar();
-    /*if (pHeroController) {
-        PlayerData* pPlayerData = pHeroController->playerData();
-        Transform* pTransform = pHeroController->transform();
-
-        ImGui::Checkbox("Infinite Air Jump", &pPlayerData->infiniteAirJump());
-        ImGui::Checkbox("InstaKill", &isInstaKill);
-        ImGui::Checkbox("Invincible", &isInvincible);
-        if (ImGui::Button("+100 Geo")) {
-            pHeroController->AddGeo(100);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("+1000 Geo")) {
-            pHeroController->AddGeo(1000);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("+10000 Geo")) {
-            pHeroController->AddGeo(10000);
-        }
-        if (ImGui::Button("Print scenesVisited")) {
-            auto pScenesVisited = pPlayerData->scenesVisited();
-            std::cout << pScenesVisited << '\n';
-            std::cout << "_items : " << pScenesVisited->_items << ' ' << &pScenesVisited->_items << '\n';
-            std::cout << "_size : " << pScenesVisited->_size << ' ' << &pScenesVisited->_size << '\n';
-            String** items = pScenesVisited->_items->vector;
-            std::cout << items << '\n';
-
-            for (int i = 0; i < pScenesVisited->_size; i++) {
-                std::wcout << items[i]->chars << '\n';
-            }
-        }
-        Vector3 pos = pTransform->get_position();
-        ImGui::Text("%f %f %f", pos.x, pos.y, pos.z);
-    }*/
     ImGui::End();
 }
 
@@ -137,20 +137,33 @@ static void RenderHeroTab() {
             PlayerData* pPlayerData = pHeroController->playerData();
             ImGui::SeparatorText("HEALTH");
             ImGui::Checkbox("Invincible", &isInvincible);
-            if (ImGui::Button("Restore health")) {
-                pHeroController->MaxHealth();
-            }
+            if (ImGui::Button("Restore health"))
+                pHeroController->AddHealth(pPlayerData->maxHealth() - pPlayerData->health());
+            ImGui::Spacing();
 
             ImGui::SeparatorText("DAMAGE");
             ImGui::Checkbox("Insta kill", &isInstaKill);
             ImGui::Checkbox("Fast attacks", &isFastAttack);
+            ImGui::Spacing();
 
             ImGui::SeparatorText("MOVEMENT");
             ImGui::SliderFloat("Speed multiplier", &speedMultiplier, 1., 5., "%.1f");
             ImGui::Checkbox("Infinite jumps", &pPlayerData->infiniteAirJump());
             ImGui::Checkbox("Infinite dash", &isInfiniteDash);
-            // has dash skipped
+            HasDash hasDash;
+            bool dashUnlocked = hasDash.Get();
+            bool dashUnlockedCopy = dashUnlocked;
+            ImGui::Checkbox("Dash unlocked", &dashUnlocked);
+            if (dashUnlocked != dashUnlockedCopy)
+                hasDash.Set(dashUnlocked);
+            HasShadowDash hasShadowDash;
+            dashUnlocked = hasShadowDash.Get();
+            dashUnlockedCopy = dashUnlocked;
+            ImGui::Checkbox("Shadow dash unlocked", &dashUnlocked);
+            if (dashUnlocked != dashUnlockedCopy)
+                hasShadowDash.Set(dashUnlocked);
             ImGui::SliderFloat("Dash distance", &pHeroController->DASH_SPEED(), 0., 80., "%.1f");
+            ImGui::Spacing();
 
             ImGui::SeparatorText("GEO");
             if (ImGui::Button("+100 geo"))
@@ -162,6 +175,7 @@ static void RenderHeroTab() {
             if (ImGui::Button("+10000 geo"))
                 pHeroController->AddGeo(10000);
             ImGui::SliderInt("Geo multiplier", &geoMultiplier, 1, 10);
+            ImGui::Spacing();
 
             ImGui::SeparatorText("MISC");
             ImGui::Checkbox("Infinite soul", &isInfiniteSoul);
@@ -170,6 +184,7 @@ static void RenderHeroTab() {
             ImGui::SliderFloat("Time scale", &timeScale, 1., 4., "%.1f");
             if (timeScale != timeScaleCopy)
                 game::funcs::Time_set_timeScale(timeScale);
+            ImGui::Spacing();
         }
         ImGui::EndTabItem();
     }
@@ -185,36 +200,46 @@ static void RenderMapTab() {
             ImGui::Checkbox("Mapper shop", &pPlayerData->openedMapperShop());
             ImGui::Checkbox("Has quill", &pPlayerData->hasQuill());
             ImGui::Checkbox("Has compass", &pPlayerData->gotCharm_2());
+            ImGui::Spacing();
 
             ImGui::SeparatorText("REGIONS");
-            ImGui::Checkbox("Dirtmouth", &pPlayerData->mapDirtmouth());
-            ImGui::Checkbox("Crossroads", &pPlayerData->mapCrossroads());
-            ImGui::Checkbox("Greenpath", &pPlayerData->mapGreenpath());
-            ImGui::Checkbox("FogCanyon", &pPlayerData->mapFogCanyon());
-            ImGui::Checkbox("Royal Gardens", &pPlayerData->mapRoyalGardens());
-            ImGui::Checkbox("Fungal Wastes", &pPlayerData->mapFungalWastes());
-            ImGui::Checkbox("City", &pPlayerData->mapCity());
-            ImGui::Checkbox("Waterways", &pPlayerData->mapWaterways());
-            ImGui::Checkbox("Mines", &pPlayerData->mapMines());
-            ImGui::Checkbox("Deepnest", &pPlayerData->mapDeepnest());
-            ImGui::Checkbox("Cliffs", &pPlayerData->mapCliffs());
-            ImGui::Checkbox("Outskirts", &pPlayerData->mapOutskirts());
-            ImGui::Checkbox("Resting Grounds", &pPlayerData->mapRestingGrounds());
-            ImGui::Checkbox("Abyss", &pPlayerData->mapAbyss());
+            if (ImGui::BeginTable("regions", 3))
+            {
+                ImGui::TableNextColumn(); ImGui::Checkbox("Dirtmouth", &pPlayerData->mapDirtmouth());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Crossroads", &pPlayerData->mapCrossroads());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Greenpath", &pPlayerData->mapGreenpath());
+                ImGui::TableNextColumn(); ImGui::Checkbox("FogCanyon", &pPlayerData->mapFogCanyon());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Royal Gardens", &pPlayerData->mapRoyalGardens());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Fungal Wastes", &pPlayerData->mapFungalWastes());
+                ImGui::TableNextColumn(); ImGui::Checkbox("City", &pPlayerData->mapCity());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Waterways", &pPlayerData->mapWaterways());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Mines", &pPlayerData->mapMines());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Deepnest", &pPlayerData->mapDeepnest());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Cliffs", &pPlayerData->mapCliffs());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Outskirts", &pPlayerData->mapOutskirts());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Resting Grounds", &pPlayerData->mapRestingGrounds());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Abyss", &pPlayerData->mapAbyss());
+                ImGui::EndTable();
+            }
+            ImGui::Spacing();
 
             ImGui::SeparatorText("PINS");
-            ImGui::Checkbox("Has pin", &pPlayerData->hasPin());
-            ImGui::Checkbox("Bench", &pPlayerData->hasPinBench());
-            ImGui::Checkbox("Cocoon", &pPlayerData->hasPinCocoon());
-            ImGui::Checkbox("Dream plant", &pPlayerData->hasPinDreamPlant());
-            ImGui::Checkbox("Guardian", &pPlayerData->hasPinGuardian());
-            ImGui::Checkbox("Black egg", &pPlayerData->hasPinBlackEgg());
-            ImGui::Checkbox("Shop", &pPlayerData->hasPinShop());
-            ImGui::Checkbox("Spa", &pPlayerData->hasPinSpa());
-            ImGui::Checkbox("Stag", &pPlayerData->hasPinStag());
-            ImGui::Checkbox("Tram", &pPlayerData->hasPinTram());
-            ImGui::Checkbox("Ghost", &pPlayerData->hasPinGhost());
-            ImGui::Checkbox("Grub", &pPlayerData->hasPinGrub());
+            if (ImGui::BeginTable("pins", 2)) {
+                ImGui::TableNextColumn(); ImGui::Checkbox("Has pin", &pPlayerData->hasPin());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Bench", &pPlayerData->hasPinBench());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Cocoon", &pPlayerData->hasPinCocoon());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Dream plant", &pPlayerData->hasPinDreamPlant());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Guardian", &pPlayerData->hasPinGuardian());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Black egg", &pPlayerData->hasPinBlackEgg());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Shop", &pPlayerData->hasPinShop());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Spa", &pPlayerData->hasPinSpa());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Stag", &pPlayerData->hasPinStag());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Tram", &pPlayerData->hasPinTram());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Ghost", &pPlayerData->hasPinGhost());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Grub", &pPlayerData->hasPinGrub());
+                ImGui::EndTable();
+            }
+            ImGui::Spacing();
         }
         ImGui::EndTabItem();
     }
@@ -226,8 +251,14 @@ static void RenderPowerUpsTab() {
     if (ImGui::BeginTabItem("Powerups")) {
         HeroController* pHeroController = HeroController::_instance();
         if (pHeroController) {
+            PlayerData* pPlayerData = pHeroController->playerData();
+            ImGui::SeparatorText("SPELLS");
             static const char* spell1Levels[3] = { "Locked", "Vengeful Spirit", "Shade Soul" };
+            static const char* spell2Levels[3] = { "Locked", "Desolate Dive", "Descending Dark" };
+            static const char* spell3Levels[3] = { "Locked", "Howling Wraiths", "Abyss Shriek" };
             Spell1 spell1;
+            Spell2 spell2;
+            Spell3 spell3;
             int selected = spell1.Get();
             if (ImGui::BeginCombo("Spell1", spell1Levels[selected]))
             {
@@ -243,9 +274,6 @@ static void RenderPowerUpsTab() {
                 }
                 ImGui::EndCombo();
             }
-
-            static const char* spell2Levels[3] = { "Locked", "Desolate Dive", "Descending Dark" };
-            Spell2 spell2;
             selected = spell2.Get();
             if (ImGui::BeginCombo("Spell2", spell2Levels[selected]))
             {
@@ -261,9 +289,6 @@ static void RenderPowerUpsTab() {
                 }
                 ImGui::EndCombo();
             }
-
-            static const char* spell3Levels[3] = { "Locked", "Howling Wraiths", "Abyss Shriek" };
-            Spell3 spell3;
             selected = spell3.Get();
             if (ImGui::BeginCombo("Spell3", spell3Levels[selected]))
             {
@@ -279,15 +304,67 @@ static void RenderPowerUpsTab() {
                 }
                 ImGui::EndCombo();
             }
+            ImGui::Spacing();
 
+            ImGui::SeparatorText("ABILITIES");
+            ImGui::Checkbox("Isma\'s tear", &pPlayerData->hasAcidArmour());
+            ImGui::Checkbox("Dream nail", &pPlayerData->hasDreamNail());
+            if (ImGui::Button("+1 dream orb"))
+                pPlayerData->dreamOrbs() += 1;
+            ImGui::SameLine();
+            if (ImGui::Button("+10 dream orb"))
+                pPlayerData->dreamOrbs() += 10;
+            ImGui::SameLine();
+            if (ImGui::Button("+100 dream orb"))
+                pPlayerData->dreamOrbs() += 100;
+            ImGui::Checkbox("Awoken dream nail", &pPlayerData->dreamNailUpgraded());
+            ImGui::Checkbox("Dreamgate", &pPlayerData->hasDreamGate());
+            ImGui::Spacing();
+
+            ImGui::SeparatorText("KEYS");
+            if (ImGui::BeginTable("KEYS", 2)) {
+                ImGui::TableNextColumn(); ImGui::Checkbox("City crest", &pPlayerData->hasCityKey());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Elegant key", &pPlayerData->hasWhiteKey());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Kings brand", &pPlayerData->hasKingsBrand());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Love key", &pPlayerData->hasLoveKey());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Shopkeeper\'s Key", &pPlayerData->hasSlykey());
+                ImGui::EndTable();
+            }
+            if (ImGui::Button("Add simple key"))
+                ++pPlayerData->simpleKeys();
+            ImGui::Spacing();
+
+            ImGui::SeparatorText("EXPLORATION & QUESTS");
+            if (ImGui::BeginTable("EXPLORATION & QUESTS", 2)) {
+                ImGui::TableNextColumn(); ImGui::Checkbox("Tram pass", &pPlayerData->hasTramPass());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Lumafly lantern", &pPlayerData->hasLantern());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Hunter\'s journal", &pPlayerData->hasJournal());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Hunter\'s mask", &pPlayerData->hasHuntersMark());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Delicate flower", &pPlayerData->hasXunFlower());
+                ImGui::TableNextColumn(); ImGui::Checkbox("Godtuner", &pPlayerData->hasGodfinder());
+                ImGui::EndTable();
+            }
+            if (ImGui::Button("Get all charms")) {
+                pPlayerData->hasCharm() = true;
+                bool* pCharm = &pPlayerData->gotCharm_1();
+                *pCharm = true;
+                for (pCharm += 7; pCharm <= &pPlayerData->gotCharm_40(); pCharm += 8)
+                    *pCharm = true;
+            }
         }
         ImGui::EndTabItem();
     }
 }
 
 void ApplyStyle() {
+    RECT desktop;
+    const HWND hDesktop = GetDesktopWindow();
+    GetWindowRect(hDesktop, &desktop);
+    float fontSize = std::round(13 * (float)desktop.bottom / 1080);
+    LOG_DEBUG << "Resolution, font: " << desktop.right << 'x' << desktop.bottom << ' ' << fontSize << LOG_FLUSH;
+
     ImGuiIO& io = ImGui::GetIO();
-    ImFont* font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\trebucbd.ttf", 13);
+    ImFont* font = io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\trebucbd.ttf", fontSize);
 
     ImGuiStyle* styles = &ImGui::GetStyle();
     auto colors = styles->Colors;

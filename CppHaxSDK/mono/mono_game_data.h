@@ -39,8 +39,8 @@ public:
     void AddGeo(int amount) { 
         game::funcs::HeroController_AddGeo(this, amount); 
     }
-    void MaxHealth() { 
-        game::funcs::HeroController_MaxHealth(this); 
+    void AddHealth(int amount) { 
+        game::funcs::HeroController_AddHealth(this, amount); 
     }
     void AddMPCharge(int amount) { 
         game::funcs::HeroController_AddMPCharge(this, amount); 
@@ -62,24 +62,14 @@ public:
 
 class PlayerData : public MonoObject {
 public:
-    static PlayerData* _instance() { 
-        return *game::static_fields::PlayerData__instance; 
-    }
-    bool& infiniteAirJump() { 
-        return *(bool*)((char*)this + game::offsets::PlayerData_infiniteAirJump); 
-    }
-    bool& isInvincible() { 
-        return *(bool*)((char*)this + game::offsets::PlayerData_isInvincible); 
-    }
-    int& maxMP() { 
-        return *(int*)((char*)this + game::offsets::PlayerData_maxMP); 
-    }
-    int& MPCharge() { 
-        return *(int*)((char*)this + game::offsets::PlayerData_MPCharge); 
-    }
-    List<String*>* scenesVisited() { 
-        return *(List<String*>**)((char*)this + game::offsets::PlayerData_scenesVisited); 
-    }
+    static PlayerData* _instance() { return *game::static_fields::PlayerData__instance; }
+    int& maxHealth() { return *(int*)((char*)this + game::offsets::PlayerData_maxHealth); }
+    int& health() { return *(int*)((char*)this + game::offsets::PlayerData_health); }
+    bool& infiniteAirJump() { return *(bool*)((char*)this + game::offsets::PlayerData_infiniteAirJump); }
+    bool& isInvincible() { return *(bool*)((char*)this + game::offsets::PlayerData_isInvincible); }
+    int& maxMP() { return *(int*)((char*)this + game::offsets::PlayerData_maxMP); }
+    int& MPCharge() { return *(int*)((char*)this + game::offsets::PlayerData_MPCharge); }
+    List<String*>* scenesVisited() { return *(List<String*>**)((char*)this + game::offsets::PlayerData_scenesVisited); }
     bool& hasMap() { return *(bool*)((char*)this + game::offsets::PlayerData_hasMap); }
     bool& openedMapperShop() { return *(bool*)((char*)this + game::offsets::PlayerData_openedMapperShop); }
     bool& hasQuill() { return *(bool*)((char*)this + game::offsets::PlayerData_hasQuill); }
@@ -115,6 +105,35 @@ public:
     int& fireballLevel() { return *(int*)((char*)this + game::offsets::PlayerData_fireballLevel); }
     int& quakeLevel() { return *(int*)((char*)this + game::offsets::PlayerData_quakeLevel); }
     int& screamLevel() { return *(int*)((char*)this + game::offsets::PlayerData_screamLevel); }
+
+    bool& hasAcidArmour() { return *(bool*)((char*)this + game::offsets::PlayerData_hasAcidArmour); }
+    bool& hasDreamNail() { return *(bool*)((char*)this + game::offsets::PlayerData_hasDreamNail); }
+    int& dreamOrbs() { return *(int*)((char*)this + game::offsets::PlayerData_dreamOrbs); }
+    bool& dreamNailUpgraded() { return *(bool*)((char*)this + game::offsets::PlayerData_dreamNailUpgraded); }
+    bool& hasDreamGate() { return *(bool*)((char*)this + game::offsets::PlayerData_hasDreamGate); }
+    // keys
+    bool& hasCityKey() { return *(bool*)((char*)this + game::offsets::PlayerData_hasCityKey); }
+    bool& hasWhiteKey() { return *(bool*)((char*)this + game::offsets::PlayerData_hasWhiteKey); }
+    bool& hasKingsBrand() { return *(bool*)((char*)this + game::offsets::PlayerData_hasKingsBrand); }
+    bool& hasLoveKey() { return *(bool*)((char*)this + game::offsets::PlayerData_hasLoveKey); }
+    bool& hasSlykey() { return *(bool*)((char*)this + game::offsets::PlayerData_hasSlykey); }
+    int& simpleKeys() { return *(int*)((char*)this + game::offsets::PlayerData_simpleKeys); }
+
+    bool& hasTramPass() { return *(bool*)((char*)this + game::offsets::PlayerData_hasTramPass); }
+    bool& hasLantern() { return *(bool*)((char*)this + game::offsets::PlayerData_hasLantern); }
+    bool& hasJournal() { return *(bool*)((char*)this + game::offsets::PlayerData_hasJournal); }
+    bool& hasHuntersMark() { return *(bool*)((char*)this + game::offsets::PlayerData_hasHuntersMark); }
+    bool& hasXunFlower() { return *(bool*)((char*)this + game::offsets::PlayerData_hasXunFlower); }
+    bool& hasGodfinder() { return *(bool*)((char*)this + game::offsets::PlayerData_hasGodfinder); }
+
+    bool& hasCharm() { return *(bool*)((char*)this + game::offsets::PlayerData_hasCharm); }
+    bool& gotCharm_1() { return *(bool*)((char*)this + game::offsets::PlayerData_gotCharm_1); }
+    bool& gotCharm_40() { return *(bool*)((char*)this + game::offsets::PlayerData_gotCharm_40); }
+    
+    bool& hasDash() { return *(bool*)((char*)this + game::offsets::PlayerData_hasDash); }
+    bool& canDash() { return *(bool*)((char*)this + game::offsets::PlayerData_canDash); }
+    bool& hasShadowDash() { return *(bool*)((char*)this + game::offsets::PlayerData_hasShadowDash); }
+    bool& canShadowDash() { return *(bool*)((char*)this + game::offsets::PlayerData_canShadowDash); }
 };
 
 class Transform : public MonoObject {

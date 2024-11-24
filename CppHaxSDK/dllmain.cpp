@@ -11,7 +11,7 @@
 ImplementationDetails details;
 
 static void Start() {
-	LOG_INIT(DEBUG, true);
+	LOG_INIT(DEBUG, false);
 	mono::Initialize();
     cheat::Initialize();
 	haxsdk::ImplementImGui(details);

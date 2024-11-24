@@ -7,7 +7,7 @@ enum ImplementationApi {
 };
 
 struct ImplementationDetails {
-    ImplementationApi api = All;
+    int api = All;
     void(*ApplyStyleProc)();
     void(*DrawMenuProc)(bool*); // bool* added to be compatible with ImGui::ShowDemoWindow
 };
