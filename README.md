@@ -3,39 +3,36 @@
 ## TODO
 
 - [ ] Логирование
-  - [X] Базовое для собственной разработки
-  - [ ] Продвинутое
+  - [X] Базовое для разработки
+  - [X] Многопоточность
+  - [X] Сохранение лога в файл
+  - [X] Вывод в консоль
+  - [ ] Вложенное логирование
 - [ ] Документация
-- [ ] Dear ImGui хук для OpenGL
-  - [X] Базовая реализация
-  - [ ] Сделать меню невидимым для программ захвата экрана (OBS, ...)
-- [ ] Dear ImGui хук для DirectX 9
-  - [X] Базовая реализация
-  - [ ] Сделать меню невидимым для программ захвата экрана (OBS, ...)
-- [ ] Dear ImGui хук для DirectX 10
-  - [X] Базовая реализация
-  - [ ] Сделать меню невидимым для программ захвата экрана (OBS, ...)
-- [ ] Dear ImGui хук для DirectX 11
-- [ ] Dear ImGui хук для DirectX 12
+- [X] Dear ImGui хук для OpenGL
+- [X] Dear ImGui хук для DirectX 9
+- [X] Dear ImGui хук для DirectX 10
+- [X] Dear ImGui хук для DirectX 11
+- [X] Dear ImGui хук для DirectX 12
 - [ ] Dear ImGui хук для Vulkan
 - [ ] Реализация хука через оверлей в Steam
 - [ ] Реализация хука через оверлей в Discord
 
-## Как это работает
-### OpenGL
-TO BE DONE...
-### DirectX9
-TO BE DONE...
-### DirectX10
-TO BE DONE...
-### DirectX11
-TO BE DONE...
-### DirectX12
-TO BE DONE...
-### Vulkan
-TO BE DONE...
+- SDK для Mono
+  - [X] Работа с функциями игры
+  - [X] Работа с полями классов
+  - [X] Установка хуков функций
+  - [X] Реализация базовых .NET классов
+    - [X] List
+    - [X] Array
+    - [X] String
+    - [ ] Dictionary
+  - [X] Демонстрационный мод
 
-## Демонстрация работы меню
+## Демонстрационный мод
+![Alt text](images/MonoCheatDemo.png)
+
+## Демонстрация работы хуков разных графических API
 ### Stardew Valley (OpenGL)
 ![Alt text](images/StardewValley(OpenGL).png)
 ### Spelunky (DirectX 9)
