@@ -8,12 +8,11 @@
 #include "cheat/cheat.h"
 #include "cheat/hooks/hooks.h"
 
-ImplementationDetails details;
-
 static void Start() {
-	LOG_INIT(DEBUG, false);
+	LOG_INIT(DEBUG, true);
 	mono::Initialize();
-    cheat::Initialize();
+    ImplementationDetails details;
+    cheat::Initialize(details);
 	haxsdk::ImplementImGui(details);
 }
 

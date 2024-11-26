@@ -85,8 +85,11 @@ namespace mono {
         }
 
         MonoClass* klass = klassCache[klassName];
+        if (!klass) return nullptr;
         MonoVTable* vtable = mono_class_vtable(g_domain, klass);
+        if (!vtable) return nullptr;
         MonoClassField* field = mono_class_get_field_from_name(klass, fieldName);
+        if (!field) return nullptr;
         void* ptr = mono_vtable_get_static_field_data(vtable);
         return (void*)((char*)mono_vtable_get_static_field_data(vtable) + field->offset);
     }

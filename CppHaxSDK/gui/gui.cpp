@@ -100,6 +100,8 @@ namespace dx12 {
     static executeCommandLists_t        oExecuteCommandLists;
 }
 
+extern long windowWidth;
+extern long windowHeight;
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 enum GraphicsAPI { OpenGL, D3D9, D3D10, D3D11, D3D12 };
@@ -311,6 +313,11 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
         ImGui_ImplWin32_Init(hwnd);
     }
 
+    RECT windowRect;
+    GetClientRect(hwnd, &windowRect);
+    windowHeight = windowRect.bottom - windowRect.top;
+    windowWidth = windowRect.right - windowRect.left;
+
     if (g_details.ApplyStyleProc) {
         g_details.ApplyStyleProc();
     }
@@ -486,6 +493,8 @@ namespace dx9 {
         ImGui_ImplDX9_InvalidateDeviceObjects();
         HRESULT result = oReset(pDevice, pPresentationParameters);
         ImGui_ImplDX9_CreateDeviceObjects();
+        windowHeight = pPresentationParameters->BackBufferHeight;
+        windowWidth = pPresentationParameters->BackBufferWidth;
         LOG_DEBUG << "[D3D9] Swap chain was reset" << LOG_FLUSH;
         return result;
     }
@@ -557,6 +566,8 @@ namespace dx10 {
             g_pRenderTarget->Release();
             g_pRenderTarget = nullptr;
         }
+        windowHeight = height;
+        windowWidth = width;
         LOG_DEBUG << "[D3D10] Buffers were resized" << LOG_FLUSH;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
@@ -653,6 +664,8 @@ namespace dx11 {
             g_pRenderTarget = nullptr;
         }
         LOG_DEBUG << "[D3D11] Buffers were resized" << LOG_FLUSH;
+        windowHeight = height;
+        windowWidth = width;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 } // dx11
@@ -836,15 +849,17 @@ namespace dx12 {
         }
     }
 
-    static HRESULT WINAPI HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT BufferCount, UINT Width, UINT Height, 
-                                              DXGI_FORMAT NewFormat, UINT SwapChainFlags) {
+    static HRESULT WINAPI HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width, UINT height, 
+                                              DXGI_FORMAT newFormat, UINT swapChainFlags) {
         for (UINT i = 0; i < NUM_BACK_BUFFERS; ++i) {
             if (g_mainRenderTargetResource[i]) {
                 g_mainRenderTargetResource[i]->Release();
                 g_mainRenderTargetResource[i] = NULL;
             }
         }
-         return oResizeBuffers(pSwapChain, BufferCount, Width, Height, NewFormat, SwapChainFlags);
+        windowHeight = height;
+        windowWidth = width;
+        return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 
     static void WINAPI HookedExecuteCommandLists(ID3D12CommandQueue* pCommandQueue, UINT NumCommandLists, ID3D12CommandList* ppCommandLists) {

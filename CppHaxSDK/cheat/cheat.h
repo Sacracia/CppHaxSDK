@@ -1,5 +1,7 @@
 #pragma once
 
+struct ImplementationDetails;
+
 namespace cheat {
-    void Initialize();
+    void Initialize(ImplementationDetails& details);
 }

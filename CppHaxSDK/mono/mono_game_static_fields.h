@@ -19,11 +19,10 @@ MONO_STATIC_FIELD(_instance, PlayerData**, PlayerData);
 
 MONO_STATIC_FIELD(_instance, HeroController**, HeroController);
 MONO_STATIC_FIELD(_instance, PlayerData**, PlayerData);
+MONO_STATIC_FIELD(_instance, GameCameras**, GameCameras);
 
 #undef MONO_ASSEMBLY
 #undef MONO_NAMESPACE
-
-
 
 #undef MONO_STATIC_FIELD
 #endif
