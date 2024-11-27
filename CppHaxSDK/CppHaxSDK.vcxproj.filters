@@ -90,12 +90,6 @@
     <ClInclude Include="mono\mono_api_classes.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="cheat\hooks\hooks.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="cheat\cheat.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="mono\mono_game_data.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
@@ -106,6 +100,12 @@
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="mono\mono_game_functions.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="cheat\globals.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="mono\mono_api.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -155,13 +155,10 @@
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="mono\mono.cpp">
+    <ClCompile Include="cheat\globals.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="cheat\hooks\hooks.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="cheat\cheat.cpp">
+    <ClCompile Include="mono\mono_api.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

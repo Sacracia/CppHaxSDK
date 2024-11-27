@@ -178,11 +178,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="cheat\cheat.h" />
-    <ClInclude Include="cheat\hooks\hooks.h" />
+    <ClInclude Include="cheat\globals.h" />
     <ClInclude Include="gui\gui.h" />
     <ClInclude Include="logger\logger.h" />
     <ClInclude Include="mono\mono.h" />
+    <ClInclude Include="mono\mono_api.h" />
     <ClInclude Include="mono\mono_api_classes.h" />
     <ClInclude Include="mono\mono_api_functions.h" />
     <ClInclude Include="mono\mono_game_data.h" />
@@ -211,12 +211,11 @@
     <ClInclude Include="third_party\imgui\imstb_truetype.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cheat\hooks\hooks.cpp" />
-    <ClCompile Include="cheat\cheat.cpp" />
+    <ClCompile Include="cheat\globals.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="gui\gui.cpp" />
     <ClCompile Include="logger\logger.cpp" />
-    <ClCompile Include="mono\mono.cpp" />
+    <ClCompile Include="mono\mono_api.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp" />

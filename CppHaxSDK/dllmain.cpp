@@ -3,17 +3,25 @@
 #include <iostream>
 
 #include "logger/logger.h"
-#include "gui/gui.h"
-#include "mono/mono.h"
-#include "cheat/cheat.h"
-#include "cheat/hooks/hooks.h"
+#define HAX_API extern
+#include "mono/mono_api.h"
+
+void HaxSdk::ApplyStyle() {
+
+}
+
+void HaxSdk::RenderBackground() {
+
+}
+
+void HaxSdk::RenderMenu() {
+	
+}
 
 static void Start() {
 	LOG_INIT(DEBUG, true);
-	mono::Initialize();
-    ImplementationDetails details;
-    cheat::Initialize(details);
-	haxsdk::ImplementImGui(details);
+	HaxSdk::InitializeMono();
+	HaxSdk::ImplementImGui(GraphicsApi_DirectX11 | GraphicsApi_DirectX12);
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {

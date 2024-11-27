@@ -42,12 +42,7 @@
 #include "../third_party/imgui/backend/imgui_impl_opengl3.h"
 
 #include "../logger/logger.h"
-
-#ifdef USE_MONO
-#define MONO_API_FUNC(r, n, p) extern r(*n)p
-#include "../mono/mono_api_functions.h"
-#undef MONO_API_FUNC
-#endif
+#include "../cheat/globals.h"
 
 using setCursorPos_t            = BOOL(WINAPI*)(int, int);
 using clipCursor_t              = BOOL(WINAPI*)(const RECT*);
@@ -61,8 +56,7 @@ using setRenderTargets11_t      = void(WINAPI*)(ID3D11DeviceContext*, UINT, ID3D
 using executeCommandLists_t     = void(WINAPI*)(ID3D12CommandQueue*, UINT, ID3D12CommandList*);
 using setRenderTargets12_t      = void(WINAPI*)(ID3D12GraphicsCommandList*, UINT, const D3D12_CPU_DESCRIPTOR_HANDLE*, BOOL, const D3D12_CPU_DESCRIPTOR_HANDLE*);
 
-static bool                             g_visible = true;
-static ImplementationDetails            g_details;
+static GraphicsApi                      g_graphicsApi;
 static HWND                             g_dummyHWND;
 static WNDPROC                          oWndproc;
 static setCursorPos_t                   oSetCursorPos;
@@ -100,14 +94,10 @@ namespace dx12 {
     static executeCommandLists_t        oExecuteCommandLists;
 }
 
-extern long windowWidth;
-extern long windowHeight;
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-enum GraphicsAPI { OpenGL, D3D9, D3D10, D3D11, D3D12 };
-
 struct ImGuiContextParams {
-    GraphicsAPI         api;
+    GraphicsApi         graphicsApi;
     LPDIRECT3DDEVICE9   pDevice9;
     HDC                 hdc;
     IDXGISwapChain*     pSwapChain;
@@ -149,12 +139,8 @@ namespace dx12 {
     static void WINAPI      HookedExecuteCommandLists(ID3D12CommandQueue* pCommandQueue, UINT NumCommandLists, ID3D12CommandList* ppCommandLists);
 }
 
-void haxsdk::ImplementImGui(ImplementationDetails& details) {
-    g_details = details;
-    if (!details.DrawMenuProc) {
-        g_details.DrawMenuProc = ImGui::ShowDemoWindow;
-    }
-
+void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
+    g_graphicsApi = graphicsApi;
     WNDCLASSEX dummyWindow{};
     dummyWindow.cbSize = 0;
     g_dummyHWND = GetConsoleWindow();
@@ -186,22 +172,22 @@ void haxsdk::ImplementImGui(ImplementationDetails& details) {
         do {
             std::string moduleName(me.szModule);
             std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
-            if (moduleName == "opengl32.dll" && g_details.api == All) {
+            if (moduleName == "opengl32.dll" && (graphicsApi & GraphicsApi_OpenGL)) {
                 opengl::Hook();
             }
-            if (moduleName == "d3d9.dll" && g_details.api == All) {
+            if (moduleName == "d3d9.dll" && (graphicsApi & GraphicsApi_DirectX9)) {
                 dx9::Hook();
             }
-            if (moduleName == "d3d10.dll" && g_details.api == All) {
+            if (moduleName == "d3d10.dll" && (graphicsApi & GraphicsApi_DirectX10)) {
                 dx10::Setup();
             }
-            if (moduleName == "d3d11.dll" && (g_details.api == All || (g_details.api & Dx11))) {
+            if (moduleName == "d3d11.dll" && (graphicsApi & GraphicsApi_DirectX11)) {
                 dx11::Setup();
             }
-            if (moduleName == "d3d12.dll" && (g_details.api == All || (g_details.api & Dx12))) {
+            if (moduleName == "d3d12.dll" && (graphicsApi & GraphicsApi_DirectX12)) {
                 dx12::Setup();
             }
-            if (moduleName == "vulkan-1.dll") {
+            if (moduleName == "vulkan-1.dll" && (graphicsApi & GraphicsApi_Vulkan)) {
                 LOG_INFO << "VULKAN graphics api found" << LOG_FLUSH;
             }
         } while (Module32Next(snapshot, &me));
@@ -222,7 +208,6 @@ void haxsdk::ImplementImGui(ImplementationDetails& details) {
 }
 
 static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags) {
-    static GraphicsAPI graphics;
     static bool inited = false;
     if (!inited) {
          inited = true;
@@ -230,55 +215,49 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
          ID3D11Device* pDevice11;
          ID3D12Device* pDevice12;
          DetourTransactionBegin();
-         if (g_details.api == All && pSwapChain->GetDevice(__uuidof(pDevice10), (void**)&pDevice10) == S_OK) {
+         if ((g_graphicsApi & GraphicsApi_DirectX10) && pSwapChain->GetDevice(__uuidof(pDevice10), (void**)&pDevice10) == S_OK) {
+             g_graphicsApi = GraphicsApi_DirectX10;
              LOG_INFO << "GAME USES DIRECTX10" << LOG_FLUSH;
-             graphics = GraphicsAPI::D3D10;
              DetourAttach(&(PVOID&)oResizeBuffers, dx10::HookedResizeBuffers);
          }
-         else if ((g_details.api == All || (g_details.api & Dx11)) && pSwapChain->GetDevice(__uuidof(pDevice11), (void**)&pDevice11) == S_OK) {
+         else if ((g_graphicsApi & GraphicsApi_DirectX11) && pSwapChain->GetDevice(__uuidof(pDevice11), (void**)&pDevice11) == S_OK) {
+             g_graphicsApi = GraphicsApi_DirectX11;
              LOG_INFO << "GAME USES DIRECTX11" << LOG_FLUSH;
-             graphics = GraphicsAPI::D3D11;
              DetourAttach(&(PVOID&)oResizeBuffers, dx11::HookedResizeBuffers);
          }
-         else if ((g_details.api == All || (g_details.api & Dx12)) && pSwapChain->GetDevice(__uuidof(pDevice12), (void**)&pDevice12) == S_OK) {
+         else if ((g_graphicsApi & GraphicsApi_DirectX12) && pSwapChain->GetDevice(__uuidof(pDevice12), (void**)&pDevice12) == S_OK) {
+             g_graphicsApi = GraphicsApi_DirectX12;
              LOG_INFO << "GAME USES DIRECTX12" << LOG_FLUSH;
-             graphics = GraphicsAPI::D3D12;
              DetourAttach(&(PVOID&)oResizeBuffers, dx12::HookedResizeBuffers);
              DetourAttach(&(PVOID&)dx12::oExecuteCommandLists, dx12::HookedExecuteCommandLists);
+         }
+         else {
+             g_graphicsApi = GraphicsApi_None;
          }
          DetourTransactionCommit();
     }
 
-    switch (graphics) {
-    case GraphicsAPI::D3D10:
+    if (g_graphicsApi & GraphicsApi_DirectX10)
         dx10::Render(pSwapChain);
-        break;
-    case GraphicsAPI::D3D11:
+    else if (g_graphicsApi & GraphicsApi_DirectX11)
         dx11::Render(pSwapChain);
-        break;
-    case GraphicsAPI::D3D12:
+    else if (g_graphicsApi & GraphicsApi_DirectX12)
         dx12::Render((dx12::IDXGISwapChain3*)pSwapChain);
-        break;
-    }
 
     return oPresent(pSwapChain, syncInterval, flags);
 }
 
 static void InitImGuiContext(const ImGuiContextParams& params) {
-    #ifdef USE_MONO
-    MonoDomain* domain = mono_get_root_domain();
-    mono_thread_attach(domain);
-    mono_thread_attach(mono_domain_get());
-    #endif
+    HaxSdk::AttachToThread();
 
     HWND hwnd = 0;
-    if (params.api == GraphicsAPI::OpenGL) {
+    if (params.graphicsApi & GraphicsApi_OpenGL) {
         hwnd = WindowFromDC(params.hdc);
         ImGui::CreateContext();
         ImGui_ImplWin32_Init(hwnd);
         ImGui_ImplOpenGL3_Init();
     }
-    if (params.api == GraphicsAPI::D3D9) {
+    if (params.graphicsApi & GraphicsApi_DirectX9) {
         D3DDEVICE_CREATION_PARAMETERS creationParams;
         params.pDevice9->GetCreationParameters(&creationParams);
         hwnd = creationParams.hFocusWindow;
@@ -286,7 +265,7 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
         ImGui_ImplWin32_Init(hwnd);
         ImGui_ImplDX9_Init(params.pDevice9);
     }
-    if (params.api == GraphicsAPI::D3D10) {
+    if (params.graphicsApi & GraphicsApi_DirectX10) {
         DXGI_SWAP_CHAIN_DESC swapChainDesc;
         params.pSwapChain->GetDevice(IID_PPV_ARGS(&dx10::g_pDevice));
         params.pSwapChain->GetDesc(&swapChainDesc);
@@ -295,7 +274,7 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
         ImGui_ImplWin32_Init(hwnd);
         ImGui_ImplDX10_Init(dx10::g_pDevice);
     }
-    if (params.api == GraphicsAPI::D3D11) {
+    if (params.graphicsApi & GraphicsApi_DirectX11) {
         DXGI_SWAP_CHAIN_DESC swapChainDesc;
         params.pSwapChain->GetDevice(IID_PPV_ARGS(&dx11::g_pDevice));
         params.pSwapChain->GetDesc(&swapChainDesc);
@@ -305,7 +284,7 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
         ImGui_ImplWin32_Init(hwnd);
         ImGui_ImplDX11_Init(dx11::g_pDevice, dx11::g_pDeviceContext);
     }
-    if (params.api == GraphicsAPI::D3D12) {
+    if (params.graphicsApi & GraphicsApi_DirectX12) {
         DXGI_SWAP_CHAIN_DESC swapChainDesc;
         params.pSwapChain->GetDesc(&swapChainDesc);
         hwnd = swapChainDesc.OutputWindow;
@@ -315,15 +294,13 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
 
     RECT windowRect;
     GetClientRect(hwnd, &windowRect);
-    windowHeight = windowRect.bottom - windowRect.top;
-    windowWidth = windowRect.right - windowRect.left;
+    globals::g_screenHeight = windowRect.bottom - windowRect.top;
+    globals::g_screenWidth = windowRect.right - windowRect.left;
+    std::cout << globals::g_screenWidth << 'x' << globals::g_screenHeight << '\n';
 
-    if (g_details.ApplyStyleProc) {
-        g_details.ApplyStyleProc();
-    }
-
+    HaxSdk::ApplyStyle();
     ImGuiIO& io = ImGui::GetIO();
-    io.WantCaptureMouse = g_visible;
+    io.WantCaptureMouse = globals::g_visible;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
     oWndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
 
@@ -342,11 +319,11 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
     io.MousePos.y = (float)position.y;
 
     if (uMsg == WM_KEYUP && wParam == VK_OEM_3) { 
-        g_visible = !g_visible;
-        io.MouseDrawCursor = g_visible;
+        globals::g_visible = !globals::g_visible;
+        io.MouseDrawCursor = globals::g_visible;
     }
 
-    if (g_visible) {
+    if (globals::g_visible) {
         RECT rect;
         GetWindowRect(hWnd, &rect);
         HookedClipCursor(&rect);
@@ -386,11 +363,11 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 }
 
 static BOOL WINAPI HookedSetCursorPos(int X, int Y) {
-    return g_visible ? true : oSetCursorPos(X, Y);
+    return globals::g_visible ? true : oSetCursorPos(X, Y);
 }
 
 static BOOL WINAPI HookedClipCursor(const RECT* lpRect) {
-    return oClipCursor(g_visible ? NULL : lpRect);
+    return oClipCursor(globals::g_visible ? NULL : lpRect);
 }
 
 namespace opengl {
@@ -410,7 +387,7 @@ namespace opengl {
 
     static bool WINAPI HookedSwapBuffers(HDC hdc) {
         if (!ImGui::GetCurrentContext()) {
-            ImGuiContextParams params = { GraphicsAPI::OpenGL, nullptr, hdc, nullptr };
+            ImGuiContextParams params = { GraphicsApi_OpenGL, nullptr, hdc, nullptr };
             InitImGuiContext(params);
             LOG_INFO << "GAME USES OPENGL" << LOG_FLUSH;
         }
@@ -418,9 +395,9 @@ namespace opengl {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-        if (g_visible) {
-            g_details.DrawMenuProc(nullptr);
-        }
+        HaxSdk::RenderBackground();
+        if (globals::g_visible)
+            HaxSdk::RenderMenu();
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -470,7 +447,7 @@ namespace dx9 {
         static bool inited = false;
         if (!inited) {
             inited = true;
-            ImGuiContextParams params = { GraphicsAPI::D3D9, pDevice, 0, nullptr };
+            ImGuiContextParams params = { GraphicsApi_DirectX9, pDevice, 0, nullptr };
             InitImGuiContext(params);
             LOG_INFO << "GAME USES DIRECTX9" << LOG_FLUSH;
         }
@@ -478,9 +455,8 @@ namespace dx9 {
         ImGui_ImplDX9_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-        if (g_visible) {
-            g_details.DrawMenuProc(nullptr);
-        }
+        if (globals::g_visible)
+            HaxSdk::RenderMenu();
         ImGui::EndFrame();
 
         ImGui::Render();
@@ -493,8 +469,8 @@ namespace dx9 {
         ImGui_ImplDX9_InvalidateDeviceObjects();
         HRESULT result = oReset(pDevice, pPresentationParameters);
         ImGui_ImplDX9_CreateDeviceObjects();
-        windowHeight = pPresentationParameters->BackBufferHeight;
-        windowWidth = pPresentationParameters->BackBufferWidth;
+        globals::g_screenHeight = pPresentationParameters->BackBufferHeight;
+        globals::g_screenWidth = pPresentationParameters->BackBufferWidth;
         LOG_DEBUG << "[D3D9] Swap chain was reset" << LOG_FLUSH;
         return result;
     }
@@ -538,7 +514,7 @@ namespace dx10 {
     static void Render(IDXGISwapChain* pSwapChain) {
         if (!ImGui::GetCurrentContext()) {
             ImGuiContextParams params;
-            params.api = GraphicsAPI::D3D10;
+            params.graphicsApi = GraphicsApi_DirectX10;
             params.pSwapChain = pSwapChain;
             InitImGuiContext(params);
         }
@@ -550,9 +526,8 @@ namespace dx10 {
         ImGui_ImplDX10_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-        if (g_visible) {
-            g_details.DrawMenuProc(nullptr);
-        }
+        if (globals::g_visible)
+            HaxSdk::RenderMenu();
         ImGui::EndFrame();
         ImGui::Render();
 
@@ -566,8 +541,8 @@ namespace dx10 {
             g_pRenderTarget->Release();
             g_pRenderTarget = nullptr;
         }
-        windowHeight = height;
-        windowWidth = width;
+        globals::g_screenHeight = height;
+        globals::g_screenWidth = width;
         LOG_DEBUG << "[D3D10] Buffers were resized" << LOG_FLUSH;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
@@ -637,7 +612,7 @@ namespace dx11 {
     static void Render(IDXGISwapChain* pSwapChain) {
         if (!ImGui::GetCurrentContext()) {
             ImGuiContextParams params;
-            params.api = GraphicsAPI::D3D11;
+            params.graphicsApi = GraphicsApi_DirectX11;
             params.pSwapChain = pSwapChain;
             InitImGuiContext(params);
         }
@@ -648,9 +623,8 @@ namespace dx11 {
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-        if (g_visible) {
-            g_details.DrawMenuProc(nullptr);
-        }
+        if (globals::g_visible)
+            HaxSdk::RenderMenu();
         ImGui::EndFrame();
         ImGui::Render();
         g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTarget, nullptr);
@@ -664,8 +638,8 @@ namespace dx11 {
             g_pRenderTarget = nullptr;
         }
         LOG_DEBUG << "[D3D11] Buffers were resized" << LOG_FLUSH;
-        windowHeight = height;
-        windowWidth = width;
+        globals::g_screenHeight = height;
+        globals::g_screenWidth = width;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 } // dx11
@@ -760,7 +734,7 @@ namespace dx12 {
     static void Render(IDXGISwapChain3* pSwapChain) {
         if (!ImGui::GetCurrentContext()) {
             ImGuiContextParams params;
-            params.api = GraphicsAPI::D3D12;
+            params.graphicsApi = GraphicsApi_DirectX12;
             params.pSwapChain = pSwapChain;
             InitImGuiContext(params);
         }
@@ -817,11 +791,8 @@ namespace dx12 {
             ImGui_ImplDX12_NewFrame();
             ImGui_ImplWin32_NewFrame();
             ImGui::NewFrame();
-
-            if (g_visible) {
-                g_details.DrawMenuProc(nullptr);
-            }
-
+            if (globals::g_visible)
+                HaxSdk::RenderMenu();
             ImGui::Render();
 
             UINT backBufferIdx = pSwapChain->GetCurrentBackBufferIndex();
@@ -857,8 +828,8 @@ namespace dx12 {
                 g_mainRenderTargetResource[i] = NULL;
             }
         }
-        windowHeight = height;
-        windowWidth = width;
+        globals::g_screenHeight = height;
+        globals::g_screenWidth = width;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 
