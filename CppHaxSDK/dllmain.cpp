@@ -6,6 +6,8 @@
 #define HAX_API extern
 #include "mono/mono_api.h"
 
+#include "imgui.h"
+
 void HaxSdk::ApplyStyle() {
 
 }
@@ -15,13 +17,18 @@ void HaxSdk::RenderBackground() {
 }
 
 void HaxSdk::RenderMenu() {
-	
+    ImGui::ShowDemoWindow();
 }
 
 static void Start() {
 	LOG_INIT(DEBUG, true);
 	HaxSdk::InitializeMono();
-	HaxSdk::ImplementImGui(GraphicsApi_DirectX11 | GraphicsApi_DirectX12);
+    MonoClass* pKlass = HaxSdk::GetUnityClass("Assembly-CSharp", "", "AI_NetworkBehaviour_Animal");
+    Array<MonoObject*>* animals = Object::FindObjectsOfType(mono_class_get_type(pKlass));
+    for (int i = 0; i < animals->max_length; ++i) {
+        std::cout << "Animal: " << animals->vector[i] << '\n';
+    }
+	//HaxSdk::ImplementImGui(GraphicsApi_DirectX11 | GraphicsApi_DirectX12);
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {

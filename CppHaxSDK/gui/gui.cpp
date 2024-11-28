@@ -160,7 +160,6 @@ void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
 
         RegisterClassEx(&dummyWindow);
         g_dummyHWND = CreateWindow(dummyWindow.lpszClassName, "Dummy window", WS_OVERLAPPEDWINDOW, 0, 0, 100, 100, nullptr, nullptr, dummyWindow.hInstance, nullptr);
-        LOG_DEBUG << "DUMMY WINDOW CREATED" << LOG_FLUSH;
     }
 
     DWORD processId = GetProcessId(GetCurrentProcess());
@@ -197,7 +196,6 @@ void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
     if (dummyWindow.cbSize > 0) {
         DestroyWindow(g_dummyHWND);
         UnregisterClass(dummyWindow.lpszClassName, dummyWindow.hInstance);
-        LOG_DEBUG << "DUMMY WINDOW DESTROYED" << LOG_FLUSH;
     }
 
     if (oPresent) {
@@ -296,7 +294,7 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
     GetClientRect(hwnd, &windowRect);
     globals::g_screenHeight = windowRect.bottom - windowRect.top;
     globals::g_screenWidth = windowRect.right - windowRect.left;
-    std::cout << globals::g_screenWidth << 'x' << globals::g_screenHeight << '\n';
+    LOG_DEBUG << "Game resolution is " << globals::g_screenWidth << 'x' << globals::g_screenHeight << '\n';
 
     HaxSdk::ApplyStyle();
     ImGuiIO& io = ImGui::GetIO();
@@ -471,7 +469,7 @@ namespace dx9 {
         ImGui_ImplDX9_CreateDeviceObjects();
         globals::g_screenHeight = pPresentationParameters->BackBufferHeight;
         globals::g_screenWidth = pPresentationParameters->BackBufferWidth;
-        LOG_DEBUG << "[D3D9] Swap chain was reset" << LOG_FLUSH;
+        LOG_DEBUG << "[D3D9] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
         return result;
     }
 } // dx9
@@ -543,7 +541,7 @@ namespace dx10 {
         }
         globals::g_screenHeight = height;
         globals::g_screenWidth = width;
-        LOG_DEBUG << "[D3D10] Buffers were resized" << LOG_FLUSH;
+        LOG_DEBUG << "[D3D10] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 
@@ -637,7 +635,7 @@ namespace dx11 {
             g_pRenderTarget->Release();
             g_pRenderTarget = nullptr;
         }
-        LOG_DEBUG << "[D3D11] Buffers were resized" << LOG_FLUSH;
+        LOG_DEBUG << "[D3D11] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
         globals::g_screenHeight = height;
         globals::g_screenWidth = width;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
@@ -830,6 +828,7 @@ namespace dx12 {
         }
         globals::g_screenHeight = height;
         globals::g_screenWidth = width;
+        LOG_DEBUG << "[D3D12] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 

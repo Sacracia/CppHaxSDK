@@ -7,10 +7,24 @@
 #include <assert.h>
 #include <iostream>
 
+#ifdef _WIN64
+#define UNITY_CORE_ASSEMBLY "UnityEngine.CoreModule"
+#else
+#define UNITY_CORE_ASSEMBLY "UnityEngine"
+#endif
+
+#define MONO_FUNCTION(a, n, c, m, s) MonoMethodWrapper c ## __ ## m
+#define MONO_STATIC_FIELD(a, n, c, f, t) t* c ## __ ## f
+#include "core_data.h"
+#include "../cheat/game_data.h"
+#undef MONO_FUNCTION
+#undef MONO_STATIC_FIELD
+
 static MonoDomain* g_domain;
 
 static HMODULE GetMonoHandle();
 static void InitializeMonoApiFunctions(HMODULE hMono);
+static void InitializeCoreData();
 
 namespace HaxSdk {
 	void InitializeMono() {
@@ -18,12 +32,12 @@ namespace HaxSdk {
 		assert(hMono && "Mono not found");
 		InitializeMonoApiFunctions(hMono);
 		HaxSdk::AttachToThread();
+        InitializeCoreData();
 	}
 
 	void AttachToThread() {
-		g_domain = mono_get_root_domain();
-		mono_thread_attach(g_domain);
-		mono_thread_attach(mono_domain_get());
+        mono_get_root_domain()->AttachThread();
+        mono_domain_get()->AttachThread();
 	}
 }
 
@@ -55,6 +69,7 @@ static void InitializeMonoApiFunctions(HMODULE hMono) {
 	assert(mono_class_get_field_from_name = reinterpret_cast<decltype(mono_class_get_field_from_name)>(GetProcAddress(hMono, "mono_class_get_field_from_name")));
 	assert(mono_class_vtable = reinterpret_cast<decltype(mono_class_vtable)>(GetProcAddress(hMono, "mono_class_vtable")));
 	assert(mono_object_get_class = reinterpret_cast<decltype(mono_object_get_class)>(GetProcAddress(hMono, "mono_object_get_class")));
+    assert(mono_class_get_type = reinterpret_cast<decltype(mono_class_get_type)>(GetProcAddress(hMono, "mono_class_get_type")));
 	// method
 	assert(mono_method_full_name = reinterpret_cast<decltype(mono_method_full_name)>(GetProcAddress(hMono, "mono_method_full_name")));
 	assert(mono_compile_method = reinterpret_cast<decltype(mono_compile_method)>(GetProcAddress(hMono, "mono_compile_method")));
@@ -64,5 +79,46 @@ static void InitializeMonoApiFunctions(HMODULE hMono) {
 	assert(mono_object_unbox = reinterpret_cast<decltype(mono_object_unbox)>(GetProcAddress(hMono, "mono_object_unbox")));
 	// field
 	assert(mono_vtable_get_static_field_data = reinterpret_cast<decltype(mono_vtable_get_static_field_data)>(GetProcAddress(hMono, "mono_vtable_get_static_field_data")));
+    assert(mono_string_new = reinterpret_cast<decltype(mono_string_new)>(GetProcAddress(hMono, "mono_string_new")));
+    assert(mono_type_get_object = reinterpret_cast<decltype(mono_type_get_object)>(GetProcAddress(hMono, "mono_type_get_object")));
 }
 
+static void InitializeCoreData() {
+    #define MONO_STATIC_FIELD(a, n, c, f, t)  c ## __ ## f = (t*)HaxSdk::GetUnityStaticFieldAddress(a, n, #c, #f);  \
+                                              std::cout << #c "__" #f ": " << c ## __ ## f << '\n';         \
+                                              assert(c ## __ ## f)
+    #define MONO_FUNCTION(a, n, c, m, s)  c ## __ ## m = HaxSdk::GetUnityFunction(a, n, #c, #m " " s); \
+                                          std::cout << #c "__" #m ": " << c ## __ ## m ## .ptr << '\n';       \
+                                          assert(c ## __ ## m)
+    #include "core_data.h"
+    #include "../cheat/game_data.h"
+}
+
+Vector3 Transform::get_position() {
+    return *(Vector3*)mono_object_unbox(mono_runtime_invoke(Transform__get_position.method, this, nullptr, nullptr));
+}
+
+Vector3 Camera::WorldToScreenPoint(Vector3 position) {
+    void* args[1] = { &position };
+    return *(Vector3*)mono_object_unbox(mono_runtime_invoke(Camera__WorldToScreenPoint.method, this, args, nullptr));
+}
+
+Array<MonoObject*>* Object::FindObjectsOfType(MonoType* type) {
+    MonoReflectionType* systemType = mono_type_get_object(g_domain, type);
+    return ((Array<MonoObject*>*(__fastcall*)(MonoReflectionType*))Object__FindObjectsOfType.ptr)(systemType);
+}
+
+MonoMethodWrapper MonoClass::GetMethod(const char* signature) {
+    void* iter = nullptr;
+    MonoMethod* method;
+    while (method = mono_class_get_methods(this, &iter)) {
+        if (strcmp(signature, mono_method_full_name(method, 1)) == 0) {
+            return { method, mono_compile_method(method) };
+        }
+    }
+
+    char message[255];
+    strcpy(message, "Method not found ");
+    strcat(message, signature);
+    throw std::runtime_error(message);
+}

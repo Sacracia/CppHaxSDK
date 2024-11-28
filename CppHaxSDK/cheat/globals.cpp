@@ -4,7 +4,7 @@
 #include <windows.h>
 
 namespace globals {
-	bool	g_visible = false;
+	bool	g_visible = true;
 	VK_KEY	g_showMenuKey = VK_OEM_3;
 	long	g_screenWidth = 0;
 	long	g_screenHeight = 0;

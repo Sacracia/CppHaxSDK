@@ -178,6 +178,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="cheat\game_data.h" />
     <ClInclude Include="cheat\globals.h" />
     <ClInclude Include="gui\gui.h" />
     <ClInclude Include="logger\logger.h" />
@@ -189,6 +190,7 @@
     <ClInclude Include="mono\mono_game_functions.h" />
     <ClInclude Include="mono\mono_game_offsets.h" />
     <ClInclude Include="mono\mono_game_static_fields.h" />
+    <ClInclude Include="mono\core_data.h" />
     <ClInclude Include="third_party\detours\x64\detours.h" />
     <ClInclude Include="third_party\detours\x64\detver.h" />
     <ClInclude Include="third_party\detours\x64\syelog.h" />
