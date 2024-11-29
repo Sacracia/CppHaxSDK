@@ -29,6 +29,7 @@ struct MonoObject;
 struct MonoClassField;
 struct MonoReflectionType;
 struct MonoArrayBounds;
+struct MonoProperty;
 template <typename T> struct MonoArray;
 
 // Representation of .NET classes from mscorlib
@@ -64,6 +65,7 @@ HAX_API MonoClassField*	(*mono_class_get_field_from_name)	(MonoClass* klass, con
 HAX_API MonoVTable*		(*mono_class_vtable)				(MonoDomain* domain, MonoClass* klass);
 HAX_API MonoClass*		(*mono_object_get_class)			(MonoObject* object);
 HAX_API MonoType*       (*mono_class_get_type)              (MonoClass* klass);
+HAX_API MonoProperty* (*mono_class_get_property_from_name)(MonoClass* klass, const char* name);
 // method
 HAX_API const char*		(*mono_method_full_name)			(MonoMethod* method, int32_t signature);
 HAX_API void*			(*mono_compile_method)				(MonoMethod* method);
@@ -100,12 +102,10 @@ struct MonoArrayBounds {
 	int64_t             lower_bound;
 };
 
-struct MonoMethodWrapper {
-    explicit operator bool() const { 
-        return method && ptr; 
+struct MonoMethod {
+    void* Ptr() {
+        return mono_compile_method(this);
     }
-    MonoMethod*         method;
-    void*               ptr;
 };
 
 struct MonoString {
@@ -125,30 +125,17 @@ struct MonoArray {
     T                   vector[32];
 };
 
-struct MonoClass {
-    MonoMethodWrapper GetMethod(const char* signature);
-    Type* GetType() {
-        return mono_type_get_object(mono_domain_get(), mono_class_get_type(this));
-    }
-    MonoClassField* Field(const char* name) {
-        return mono_class_get_field_from_name(this, name);
-    }
-    void* StaticField(const char* name) {
-        MonoVTable* pVTable = mono_class_vtable(mono_domain_get(), this);
-        char* pData = (char*)mono_vtable_get_static_field_data(pVTable);
-        return (void*)(pData + this->Field(name)->offset);
-    }
-};
-
 struct MonoDomain {
-    static MonoDomain* Current() {
+    inline static MonoDomain* Current() {
         return mono_domain_get();
     }
     MonoVTable* VTable(MonoClass* pClass) {
         return mono_class_vtable(this, pClass);
     }
-    MonoAssembly* OpenAssembly(const char* assembly) {
-        return mono_domain_assembly_open(this, assembly);
+    MonoAssembly* Assembly(const char* assembly) {
+        auto pAssembly = mono_domain_assembly_open(this, assembly);
+        assert(pAssembly);
+        return pAssembly;
     }
     void AttachThread() {
         mono_thread_attach(this);
@@ -156,15 +143,41 @@ struct MonoDomain {
 };
 
 struct MonoAssembly {
-    MonoImage* GetImage(const char* name) {
-        return mono_assembly_get_image(this);
+    MonoClass* Class(const char* name_space, const char* name) {
+        auto pClass = mono_class_from_name(mono_assembly_get_image(this), name_space, name);
+        assert(pClass);
+        return pClass;
     }
 };
 
-struct MonoImage {
-    MonoClass* GetClass(const char* name_space, const char* name) {
-        return mono_class_from_name(this, name_space, name);
+struct MonoClass {
+    MonoMethodWrapper Method(const char* signature);
+    MonoMethodWrapper Method(const char* name_space, const char* klass, const char* name, const char* params);
+
+    Type* SystemType() {
+        return mono_type_get_object(mono_domain_get(), mono_class_get_type(this));
     }
+    MonoClassField* Field(const char* name) {
+        auto pField = mono_class_get_field_from_name(this, name);
+        assert(pField);
+        return pField;
+    }
+    void* StaticField(const char* name) {
+        MonoVTable* pVTable = mono_class_vtable(mono_domain_get(), this);
+        char* pData = (char*)mono_vtable_get_static_field_data(pVTable);
+        return (void*)(pData + this->Field(name)->offset);
+    }
+    MonoProperty* Property(const char* name) {
+        return mono_class_get_property_from_name(this, name);
+    }
+    static MonoClass* Find(const char* assembly, const char* name_space, const char* name) {
+        return MonoDomain::Current()->Assembly(assembly)->Class(name_space, name);
+    }
+};
+
+struct MonoMethodWrapper {
+    MonoMethod* pMethod;
+    void* ptr;
 };
 
 template <class T>
@@ -177,7 +190,7 @@ struct List {
 };
 
 struct Object {
-    static Array<MonoObject*>* FindObjectsOfType(MonoType* type);
+    static Array<MonoObject*>* FindObjectsOfType(Type* type);
 };
 
 struct Vector3 {

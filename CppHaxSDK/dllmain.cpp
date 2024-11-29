@@ -23,11 +23,11 @@ void HaxSdk::RenderMenu() {
 static void Start() {
 	LOG_INIT(DEBUG, true);
 	HaxSdk::InitializeMono();
-    MonoClass* pKlass = HaxSdk::GetUnityClass("Assembly-CSharp", "", "AI_NetworkBehaviour_Animal");
-    Array<MonoObject*>* animals = Object::FindObjectsOfType(mono_class_get_type(pKlass));
-    for (int i = 0; i < animals->max_length; ++i) {
-        std::cout << "Animal: " << animals->vector[i] << '\n';
-    }
+	Type* pType = MonoClass::Find("Assembly-CSharp", "", "HealthManager")->SystemType();
+	auto enemies = Object::FindObjectsOfType(pType);
+	for (int i = 0; i < enemies->max_length; ++i) {
+		std::cout << "Enemy: " << enemies->vector[i] << '\n';
+	}
 	//HaxSdk::ImplementImGui(GraphicsApi_DirectX11 | GraphicsApi_DirectX12);
 }
 

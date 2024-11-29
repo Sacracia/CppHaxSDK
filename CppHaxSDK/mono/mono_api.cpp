@@ -70,6 +70,7 @@ static void InitializeMonoApiFunctions(HMODULE hMono) {
 	assert(mono_class_vtable = reinterpret_cast<decltype(mono_class_vtable)>(GetProcAddress(hMono, "mono_class_vtable")));
 	assert(mono_object_get_class = reinterpret_cast<decltype(mono_object_get_class)>(GetProcAddress(hMono, "mono_object_get_class")));
     assert(mono_class_get_type = reinterpret_cast<decltype(mono_class_get_type)>(GetProcAddress(hMono, "mono_class_get_type")));
+	assert(mono_class_get_property_from_name = (decltype(mono_class_get_property_from_name))GetProcAddress(hMono, "mono_class_get_property_from_name"));
 	// method
 	assert(mono_method_full_name = reinterpret_cast<decltype(mono_method_full_name)>(GetProcAddress(hMono, "mono_method_full_name")));
 	assert(mono_compile_method = reinterpret_cast<decltype(mono_compile_method)>(GetProcAddress(hMono, "mono_compile_method")));
@@ -84,31 +85,15 @@ static void InitializeMonoApiFunctions(HMODULE hMono) {
 }
 
 static void InitializeCoreData() {
-    #define MONO_STATIC_FIELD(a, n, c, f, t)  c ## __ ## f = (t*)HaxSdk::GetUnityStaticFieldAddress(a, n, #c, #f);  \
-                                              std::cout << #c "__" #f ": " << c ## __ ## f << '\n';         \
-                                              assert(c ## __ ## f)
-    #define MONO_FUNCTION(a, n, c, m, s)  c ## __ ## m = HaxSdk::GetUnityFunction(a, n, #c, #m " " s); \
-                                          std::cout << #c "__" #m ": " << c ## __ ## m ## .ptr << '\n';       \
-                                          assert(c ## __ ## m)
+    #define MONO_STATIC_FIELD(a, n, c, f, t)  c ## __ ## f = (t*)MonoClass::Find(a, n, #c)->StaticField(#f);  \
+                                              std::cout << #c "__" #f ": " << *(c ## __ ## f) << '\n';
+#define MONO_FUNCTION(a, n, c, m, p)  c ## __ ## m = MonoClass::Find(a, n, #c)->Method(n, #c, #m, p); \
+											  std::cout << #c "__" #m ": " << c ## __ ## m ## .ptr << '\n';
     #include "core_data.h"
     #include "../cheat/game_data.h"
 }
 
-Vector3 Transform::get_position() {
-    return *(Vector3*)mono_object_unbox(mono_runtime_invoke(Transform__get_position.method, this, nullptr, nullptr));
-}
-
-Vector3 Camera::WorldToScreenPoint(Vector3 position) {
-    void* args[1] = { &position };
-    return *(Vector3*)mono_object_unbox(mono_runtime_invoke(Camera__WorldToScreenPoint.method, this, args, nullptr));
-}
-
-Array<MonoObject*>* Object::FindObjectsOfType(MonoType* type) {
-    MonoReflectionType* systemType = mono_type_get_object(g_domain, type);
-    return ((Array<MonoObject*>*(__fastcall*)(MonoReflectionType*))Object__FindObjectsOfType.ptr)(systemType);
-}
-
-MonoMethodWrapper MonoClass::GetMethod(const char* signature) {
+MonoMethodWrapper MonoClass::Method(const char* signature) {
     void* iter = nullptr;
     MonoMethod* method;
     while (method = mono_class_get_methods(this, &iter)) {
@@ -117,8 +102,36 @@ MonoMethodWrapper MonoClass::GetMethod(const char* signature) {
         }
     }
 
-    char message[255];
-    strcpy(message, "Method not found ");
-    strcat(message, signature);
-    throw std::runtime_error(message);
+	std::cout << "Method not found " << signature << '\n';
+	assert(false);
+}
+
+MonoMethodWrapper MonoClass::Method(const char* name_space, const char* klass, const char* name, const char* params) {
+	char buffer[255];
+	if (name_space != nullptr && name_space[0] != '\0') {
+		strcpy(buffer, name_space);
+		strcat(buffer, ".");
+		strcat(buffer, klass);
+	}
+	else {
+		strcpy(buffer, klass);
+	}
+	strcat(buffer, ":");
+	strcat(buffer, name);
+	strcat(buffer, " ");
+	strcat(buffer, params);
+	return Method(buffer);
+}
+
+Array<MonoObject*>* Object::FindObjectsOfType(Type* type) {
+	return ((Array<MonoObject*>*(*)(Type*))Object__FindObjectsOfType.ptr)(type);
+}
+
+Vector3 Transform::get_position() {
+    return *(Vector3*)mono_object_unbox(mono_runtime_invoke(Transform__get_position.pMethod, this, nullptr, nullptr));
+}
+
+Vector3 Camera::WorldToScreenPoint(Vector3 position) {
+    void* args[1] = { &position };
+    return *(Vector3*)mono_object_unbox(mono_runtime_invoke(Camera__WorldToScreenPoint.pMethod, this, args, nullptr));
 }
