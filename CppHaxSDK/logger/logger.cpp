@@ -5,6 +5,7 @@
 
 #include <fstream>
 #include <time.h>
+#include <ctime>
 #include <iomanip>
 #include <mutex>
 
@@ -44,11 +45,12 @@ namespace haxsdk {
 		return *this;
 	}
 
-	inline void Logger::LogHeader(std::string_view level) {
+	void Logger::LogHeader(std::string_view level) {
 		m_mutex.lock();
 		auto t = std::time(nullptr);
-		m_ss << std::put_time(std::localtime(&t), "%d-%m-%Y %H:%M:%S") << 
-			" [" << std::left << std::setw(7) << level << "] ";
+        struct tm newtime;
+        ::localtime_s(&newtime, &t);
+		m_ss << std::put_time(&newtime, "%d-%m-%Y %H:%M:%S") << " [" << std::left << std::setw(7) << level << "] ";
 	}
 
 	void Logger::Flush() {
@@ -83,8 +85,8 @@ namespace haxsdk {
 		GetModuleFileName(NULL, buff, MAX_PATH);
 		const auto path = std::filesystem::path(buff);
 
-		const auto logPath = path.parent_path() / "cpphaxsdk-logs.txt";
-		const auto prevLogPath = path.parent_path() / "cpphaxsdk-prev-logs.txt";
+		const auto logPath = path.parent_path() / "haxsdk-logs.txt";
+		const auto prevLogPath = path.parent_path() / "haxsdk-prev-logs.txt";
 
 		std::error_code errCode;
 		std::filesystem::remove(prevLogPath, errCode);

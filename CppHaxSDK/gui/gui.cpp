@@ -292,8 +292,8 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
 
     RECT windowRect;
     GetClientRect(hwnd, &windowRect);
-    globals::g_screenHeight = windowRect.bottom - windowRect.top;
-    globals::g_screenWidth = windowRect.right - windowRect.left;
+    globals::g_screenHeight = static_cast<float>(windowRect.bottom - windowRect.top);
+    globals::g_screenWidth = static_cast<float>(windowRect.right - windowRect.left);
     LOG_DEBUG << "Game resolution is " << globals::g_screenWidth << 'x' << globals::g_screenHeight << '\n';
 
     HaxSdk::ApplyStyle();
@@ -453,6 +453,7 @@ namespace dx9 {
         ImGui_ImplDX9_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
+        HaxSdk::RenderBackground();
         if (globals::g_visible)
             HaxSdk::RenderMenu();
         ImGui::EndFrame();
@@ -467,8 +468,8 @@ namespace dx9 {
         ImGui_ImplDX9_InvalidateDeviceObjects();
         HRESULT result = oReset(pDevice, pPresentationParameters);
         ImGui_ImplDX9_CreateDeviceObjects();
-        globals::g_screenHeight = pPresentationParameters->BackBufferHeight;
-        globals::g_screenWidth = pPresentationParameters->BackBufferWidth;
+        globals::g_screenHeight = static_cast<float>(pPresentationParameters->BackBufferHeight);
+        globals::g_screenWidth = static_cast<float>(pPresentationParameters->BackBufferWidth);
         LOG_DEBUG << "[D3D9] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
         return result;
     }
@@ -524,6 +525,7 @@ namespace dx10 {
         ImGui_ImplDX10_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
+        HaxSdk::RenderBackground();
         if (globals::g_visible)
             HaxSdk::RenderMenu();
         ImGui::EndFrame();
@@ -539,8 +541,8 @@ namespace dx10 {
             g_pRenderTarget->Release();
             g_pRenderTarget = nullptr;
         }
-        globals::g_screenHeight = height;
-        globals::g_screenWidth = width;
+        globals::g_screenHeight = static_cast<float>(height);
+        globals::g_screenWidth = static_cast<float>(width);
         LOG_DEBUG << "[D3D10] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
@@ -621,6 +623,7 @@ namespace dx11 {
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
+        HaxSdk::RenderBackground();
         if (globals::g_visible)
             HaxSdk::RenderMenu();
         ImGui::EndFrame();
@@ -636,8 +639,8 @@ namespace dx11 {
             g_pRenderTarget = nullptr;
         }
         LOG_DEBUG << "[D3D11] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
-        globals::g_screenHeight = height;
-        globals::g_screenWidth = width;
+        globals::g_screenHeight = static_cast<float>(height);
+        globals::g_screenWidth = static_cast<float>(width);
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 } // dx11
@@ -789,6 +792,7 @@ namespace dx12 {
             ImGui_ImplDX12_NewFrame();
             ImGui_ImplWin32_NewFrame();
             ImGui::NewFrame();
+            HaxSdk::RenderBackground();
             if (globals::g_visible)
                 HaxSdk::RenderMenu();
             ImGui::Render();
@@ -826,8 +830,8 @@ namespace dx12 {
                 g_mainRenderTargetResource[i] = NULL;
             }
         }
-        globals::g_screenHeight = height;
-        globals::g_screenWidth = width;
+        globals::g_screenHeight = static_cast<float>(height);
+        globals::g_screenWidth = static_cast<float>(width);
         LOG_DEBUG << "[D3D12] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
