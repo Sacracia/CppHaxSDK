@@ -113,7 +113,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>USE_MONO;ImTextureID=ImU64</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ImTextureID=ImU64;HAX_MONO</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -158,7 +158,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>USE_MONO;__WIN64__</PreprocessorDefinitions>
+      <PreprocessorDefinitions>;HAX_MONO</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -181,17 +181,19 @@
     <ClInclude Include="cheat\classes.h" />
     <ClInclude Include="cheat\game_data.h" />
     <ClInclude Include="cheat\globals.h" />
+    <ClInclude Include="core\haxsdk_il2cpp.h" />
+    <ClInclude Include="core\haxsdk_mono.h" />
     <ClInclude Include="gui\gui.h" />
     <ClInclude Include="logger\logger.h" />
     <ClInclude Include="mono\mono.h" />
-    <ClInclude Include="mono\core.h" />
+    <ClInclude Include="core\core.h" />
     <ClInclude Include="mono\mono_api_classes.h" />
     <ClInclude Include="mono\mono_api_functions.h" />
     <ClInclude Include="mono\mono_game_data.h" />
     <ClInclude Include="mono\mono_game_functions.h" />
     <ClInclude Include="mono\mono_game_offsets.h" />
     <ClInclude Include="mono\mono_game_static_fields.h" />
-    <ClInclude Include="mono\core_data.h" />
+    <ClInclude Include="core\core_data.h" />
     <ClInclude Include="third_party\detours\x64\detours.h" />
     <ClInclude Include="third_party\detours\x64\detver.h" />
     <ClInclude Include="third_party\detours\x64\syelog.h" />
@@ -215,10 +217,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="cheat\globals.cpp" />
+    <ClCompile Include="core\haxsdk_il2cpp.cpp" />
+    <ClCompile Include="core\haxsdk_mono.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="gui\gui.cpp" />
     <ClCompile Include="logger\logger.cpp" />
-    <ClCompile Include="mono\core.cpp" />
+    <ClCompile Include="core\core.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp" />

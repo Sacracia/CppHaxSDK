@@ -105,16 +105,22 @@
     <ClInclude Include="cheat\globals.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="mono\core.h">
+    <ClInclude Include="core\core.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="cheat\game_data.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="mono\core_data.h">
+    <ClInclude Include="core\core_data.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="cheat\classes.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="core\haxsdk_il2cpp.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="core\haxsdk_mono.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -167,7 +173,13 @@
     <ClCompile Include="cheat\globals.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="mono\core.cpp">
+    <ClCompile Include="core\core.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="core\haxsdk_il2cpp.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="core\haxsdk_mono.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

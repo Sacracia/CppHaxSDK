@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../mono/core.h"
+#include "../core/core.h"
 #define MONO_FUNCTION(a, n, c, m, s)     extern MonoMethodWrapper c ## __ ## m
 #define MONO_STATIC_FIELD(a, n, c, f, t) extern t* c ## __ ## f
 #define MONO_FIELD_OFFSET(a, n, c, f)    extern int c ## __ ## f
@@ -8,9 +8,3 @@
 #undef MONO_FUNCTION
 #undef MONO_STATIC_FIELD
 #undef MONO_FIELD_OFFSET
-
-struct AI_NetworkBehaviour_Animal : Component {
-};
-
-struct PersonController : Component {
-};
