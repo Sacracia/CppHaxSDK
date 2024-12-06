@@ -17,6 +17,5 @@ namespace HaxSdk {
     void RenderMenu();
     void RenderBackground();
     void ApplyStyle();
-    void AttachToThread();
 	void ImplementImGui(GraphicsApi);
 }

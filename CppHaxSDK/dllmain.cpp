@@ -2,12 +2,8 @@
 #include <windows.h>
 #include <iostream>
 
-#include "imgui.h"
-#include "logger/logger.h"
-
-#include "core/core.h"
-#include "cheat/classes.h"
-#include "cheat/globals.h"
+#include "haxsdk.h"
+#include "third_party/imgui/imgui.h"
 
 void HaxSdk::ApplyStyle() {
 
@@ -23,7 +19,11 @@ void HaxSdk::RenderMenu() {
 
 static void Start() {
 	LOG_INIT(DEBUG, true);
-	HaxSdk::InitializeCore();
+	HaxSdk::InitializeMono();
+
+    MonoClass* pClass = MonoClass::find("Assembly-CSharp", "", "HeroController");
+    std::cout << pClass->find_field("wallSlash")->offset();
+
 	//HaxSdk::ImplementImGui(GraphicsApi_DirectX11 | GraphicsApi_DirectX12);
 }
 

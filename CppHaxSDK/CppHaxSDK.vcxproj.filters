@@ -69,7 +69,7 @@
     <ClInclude Include="logger\logger.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="gui\gui.h">
+    <ClInclude Include="haxsdk_gui.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl3.h">
@@ -102,25 +102,16 @@
     <ClInclude Include="mono\mono_game_functions.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="cheat\globals.h">
+    <ClInclude Include="globals.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="core\core.h">
+    <ClInclude Include="backends\haxsdk_il2cpp.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="cheat\game_data.h">
+    <ClInclude Include="backends\haxsdk_mono.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="core\core_data.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="cheat\classes.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="core\haxsdk_il2cpp.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="core\haxsdk_mono.h">
+    <ClInclude Include="haxsdk.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -161,7 +152,7 @@
     <ClCompile Include="logger\logger.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="gui\gui.cpp">
+    <ClCompile Include="haxsdk_gui.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="third_party\imgui\backend\imgui_impl_opengl3.cpp">
@@ -170,16 +161,13 @@
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="cheat\globals.cpp">
+    <ClCompile Include="globals.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="core\core.cpp">
+    <ClCompile Include="backends\haxsdk_il2cpp.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="core\haxsdk_il2cpp.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="core\haxsdk_mono.cpp">
+    <ClCompile Include="backends\haxsdk_mono.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

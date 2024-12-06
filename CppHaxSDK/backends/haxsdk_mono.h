@@ -16,6 +16,8 @@ struct  MonoReflectionType;
 struct  MonoJitInfo;
 struct  MonoImage;
 struct  MonoThread;
+struct  MonoVTable;
+struct  MonoMethodSignature;
 
 typedef MonoClass  BackendClass;
 typedef MonoMethod BackendMethod;
@@ -72,7 +74,9 @@ private:
 struct MonoMethod final {
     void*                   pointer();
     MonoClass*              klass() { return m_klass; }
-    const char*             full_name();
+    const char*             name();
+    char*                   signature();
+    MonoObject*             invoke(void* obj, void** args);
 private:
     uint16_t                m_flags;
     uint16_t                m_iflags;
@@ -81,23 +85,31 @@ private:
 };
 
 struct MonoAssembly {
-    MonoClass*              klass(const char* name_space, const char* name);
+    MonoClass*              find_klass(const char* name_space, const char* name);
+};
+
+struct MonoType {
+    MonoReflectionType*     system_type();
 };
 
 struct MonoClass {
     static MonoClass*       find(const char* assembly, const char* name_space, const char* name);
-    MonoObject*             ctor();
-    MonoMethod*             method(const char* signature);
-    MonoMethod*             method(const char* name_space, const char* klass, const char* name, const char* params);
-    void*                   static_field(const char* name);
-    MonoClassField*         field(const char* name);
-    MonoReflectionType*     system_type();
+    const char*             name()      { return m_name;}
+    const char*             namespaze() { return m_namespace;}
+    MonoType*               type();
+    MonoMethod*             find_method(const char* name, const char* params);
+    void*                   find_static_field(const char* name);
+    MonoClassField*         find_field(const char* name);
+private:
+    char                    __space[40];
+    MonoImage*              m_image;
+    const char*             m_name;
+    const char*             m_namespace;
 };
 
 struct MonoDomain {
     static MonoDomain*      root();
     static MonoDomain*      current();
-    MonoVTable*             vtable(MonoClass* pClass);
     MonoAssembly*           assembly(const char* assembly);
     void                    attach_thread();
 };

@@ -1,4 +1,4 @@
-#include "gui.h"
+#include "haxsdk_gui.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -41,8 +41,14 @@
 #include "../third_party/imgui/backend/imgui_impl_win32.h"
 #include "../third_party/imgui/backend/imgui_impl_opengl3.h"
 
-#include "../logger/logger.h"
-#include "../cheat/globals.h"
+#include "logger/logger.h"
+#include "globals.h"
+
+#ifdef HAX_MONO
+#include "backends/haxsdk_mono.h"
+#elif defined(HAX_IL2CPP)
+#include "backends/haxsdk_il2cpp.h"
+#endif
 
 using setCursorPos_t            = BOOL(WINAPI*)(int, int);
 using clipCursor_t              = BOOL(WINAPI*)(const RECT*);

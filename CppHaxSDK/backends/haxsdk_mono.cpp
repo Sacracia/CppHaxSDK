@@ -5,6 +5,9 @@
 #include <Windows.h>
 #include <TlHelp32.h>
 
+#include <iostream>
+#include <format>
+
 #define HAX_ASSERT(expr, msg) if (!(expr)) {                                                   \
                                  MessageBoxA(NULL, msg, "Hax assertion failed", MB_ICONERROR); \
                                  ExitProcess(-1);                                              \
@@ -25,7 +28,9 @@ using t_mono_class_vtable                  = MonoVTable* (*)(MonoDomain* domain,
 using t_mono_object_get_class              = MonoClass* (*)(MonoObject* object);
 using t_mono_class_get_type                = MonoType* (*)(MonoClass* klass);
 using t_mono_object_get_class              = MonoClass* (*)(MonoObject* obj);
-using t_mono_method_full_name              = const char* (*)(MonoMethod* method, int32_t signature);
+using t_mono_method_signature              = MonoMethodSignature* (*)(MonoMethod* method);
+using t_mono_method_get_name               = const char* (*)(MonoMethod* method);
+using t_mono_signature_full_name           = char* (*)(MonoMethodSignature* sig);
 using t_mono_compile_method                = void* (*)(MonoMethod* method);
 using t_mono_jit_info_table_find           = MonoJitInfo* (*)(MonoDomain* domain, void* addr);
 using t_mono_jit_info_get_method           = MonoMethod* (*)(MonoJitInfo* ji);
@@ -48,7 +53,9 @@ static t_mono_class_get_field_from_name    mono_class_get_field_from_name;
 static t_mono_class_vtable                 mono_class_vtable;
 static t_mono_object_get_class             mono_object_get_class;
 static t_mono_class_get_type               mono_class_get_type;
-static t_mono_method_full_name             mono_method_full_name;
+static t_mono_method_signature             mono_method_signature;
+static t_mono_method_get_name              mono_method_get_name;
+static t_mono_signature_full_name          mono_signature_full_name;
 static t_mono_compile_method               mono_compile_method;
 static t_mono_jit_info_table_find          mono_jit_info_table_find;
 static t_mono_jit_info_get_method          mono_jit_info_get_method;
@@ -71,11 +78,9 @@ namespace HaxSdk {
     }
 
     void AttachToThread() {
-        MonoDomain* rootDomain = MonoDomain::root();
-        MonoDomain* currentDomain = MonoDomain::current();
-        mono_thread_attach(rootDomain);
-        if (rootDomain != currentDomain)
-            mono_thread_attach(currentDomain);
+        mono_thread_attach(MonoDomain::root());
+        mono_thread_attach(MonoDomain::current());
+        std::cout << MonoDomain::root() << ' ' << MonoDomain::current() << '\n';
     }
 }
 
@@ -92,7 +97,9 @@ static void InitializeMonoApi(HMODULE hMono) {
     HAX_MONO_PROC(mono_class_vtable);
     HAX_MONO_PROC(mono_object_get_class);
     HAX_MONO_PROC(mono_class_get_type);
-    HAX_MONO_PROC(mono_method_full_name);
+    HAX_MONO_PROC(mono_method_signature);
+    HAX_MONO_PROC(mono_method_get_name);
+    HAX_MONO_PROC(mono_signature_full_name);
     HAX_MONO_PROC(mono_compile_method);
     HAX_MONO_PROC(mono_jit_info_table_find);
     HAX_MONO_PROC(mono_jit_info_get_method);
@@ -134,8 +141,84 @@ inline MonoString* MonoString::alloc(const char* raw) {
     return mono_string_new(mono_domain_get(), raw);
 }
 
-inline void* MonoMethod::pointer() {
+void* MonoMethod::pointer() {
     return mono_compile_method(this);
 }
+
+inline const char* MonoMethod::name() {
+    return mono_method_get_name(this);
+}
+
+inline char* MonoMethod::signature() {
+    return mono_signature_full_name(mono_method_signature(this));
+}
+
+MonoClass* MonoAssembly::find_klass(const char* name_space, const char* name) {
+    MonoImage* pImage = mono_assembly_get_image(this);
+    MonoClass* pClass = mono_class_from_name(pImage, name_space, name);
+    HAX_ASSERT(pClass, std::format("Class {}.{} not found", name_space, name).c_str());
+    return pClass;
+}
+
+MonoReflectionType* MonoType::system_type() {
+    return mono_type_get_object(mono_get_root_domain(), this);
+}
+
+#pragma region MonoClass
+MonoClass* MonoClass::find(const char* assembly, const char* name_space, const char* name) {
+    MonoAssembly* pAssembly = mono_domain_assembly_open(mono_get_root_domain(), assembly);
+    HAX_ASSERT(pAssembly, std::format("Assembly {} not found", assembly).c_str());
+    return pAssembly->find_klass(name_space, name);
+}
+
+inline MonoType* MonoClass::type() {
+    return mono_class_get_type(this);
+}
+
+MonoMethod* MonoClass::find_method(const char* name, const char* signature) {
+    void* iter = nullptr;
+    MonoMethod* method;
+    while (method = mono_class_get_methods(this, &iter)) {
+        std::cout << method->signature() << '\n';
+        if (strcmp(method->name(), name) == 0 && strcmp(method->signature(), signature) == 0) {
+            return method;
+        }
+    }
+    HAX_ASSERT(false, std::format("Method {} of {} not found in {}", name, signature, this->m_name).c_str());
+    return nullptr;
+}
+
+inline MonoObject* MonoMethod::invoke(void* obj, void** args) {
+    return mono_runtime_invoke(this, obj, args, nullptr);
+}
+
+void* MonoClass::find_static_field(const char* name) {
+    int offset = this->find_field(name)->offset();
+    MonoVTable* pVTable = mono_class_vtable(mono_domain_get(), this);
+    return (void*)((char*)mono_vtable_get_static_field_data(pVTable) + offset);
+}
+
+inline MonoClassField* MonoClass::find_field(const char* name) {
+    return mono_class_get_field_from_name(this, name);
+}
+#pragma endregion
+
+#pragma region MonoDomain
+inline MonoDomain* MonoDomain::root() {
+    return mono_get_root_domain();
+}
+
+inline MonoDomain* MonoDomain::current() {
+    return mono_domain_get();
+}
+
+inline void MonoDomain::attach_thread() {
+    mono_thread_attach(this);
+}
+
+inline MonoAssembly* MonoDomain::assembly(const char* name) {
+    return mono_domain_assembly_open(this, name);
+}
+#pragma endregion
 
 #endif

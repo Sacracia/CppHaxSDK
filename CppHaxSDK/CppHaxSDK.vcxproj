@@ -117,7 +117,8 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x86;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories);$(SolutionDir)CppHaxSDK\logger;$(SolutionDir)CppHaxSDK\gui</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>
+      </AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
@@ -162,7 +163,8 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x64;$(SolutionDir)CppHaxSDK\third_party\imgui;%(AdditionalIncludeDirectories);$(SolutionDir)CppHaxSDK\logger;$(SolutionDir)CppHaxSDK\gui</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>
+      </AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
@@ -178,22 +180,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="cheat\classes.h" />
-    <ClInclude Include="cheat\game_data.h" />
-    <ClInclude Include="cheat\globals.h" />
-    <ClInclude Include="core\haxsdk_il2cpp.h" />
-    <ClInclude Include="core\haxsdk_mono.h" />
-    <ClInclude Include="gui\gui.h" />
+    <ClInclude Include="globals.h" />
+    <ClInclude Include="backends\haxsdk_il2cpp.h" />
+    <ClInclude Include="backends\haxsdk_mono.h" />
+    <ClInclude Include="haxsdk.h" />
+    <ClInclude Include="haxsdk_gui.h" />
     <ClInclude Include="logger\logger.h" />
     <ClInclude Include="mono\mono.h" />
-    <ClInclude Include="core\core.h" />
     <ClInclude Include="mono\mono_api_classes.h" />
     <ClInclude Include="mono\mono_api_functions.h" />
     <ClInclude Include="mono\mono_game_data.h" />
     <ClInclude Include="mono\mono_game_functions.h" />
     <ClInclude Include="mono\mono_game_offsets.h" />
     <ClInclude Include="mono\mono_game_static_fields.h" />
-    <ClInclude Include="core\core_data.h" />
     <ClInclude Include="third_party\detours\x64\detours.h" />
     <ClInclude Include="third_party\detours\x64\detver.h" />
     <ClInclude Include="third_party\detours\x64\syelog.h" />
@@ -216,13 +215,12 @@
     <ClInclude Include="third_party\imgui\imstb_truetype.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cheat\globals.cpp" />
-    <ClCompile Include="core\haxsdk_il2cpp.cpp" />
-    <ClCompile Include="core\haxsdk_mono.cpp" />
+    <ClCompile Include="globals.cpp" />
+    <ClCompile Include="backends\haxsdk_il2cpp.cpp" />
+    <ClCompile Include="backends\haxsdk_mono.cpp" />
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="gui\gui.cpp" />
+    <ClCompile Include="haxsdk_gui.cpp" />
     <ClCompile Include="logger\logger.cpp" />
-    <ClCompile Include="core\core.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp" />
