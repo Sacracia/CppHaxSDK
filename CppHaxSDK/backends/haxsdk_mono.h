@@ -18,14 +18,14 @@ struct  MonoImage;
 struct  MonoThread;
 struct  MonoVTable;
 struct  MonoMethodSignature;
-
 typedef MonoClass  BackendClass;
 typedef MonoMethod BackendMethod;
 typedef MonoObject BackendObject;
+typedef MonoReflectionType SystemType;
 
 namespace HaxSdk {
+    void InitializeBackend();
     void AttachToThread();
-    void InitializeMono();
 }
 
 struct MonoObject {
@@ -72,20 +72,20 @@ private:
 };
 
 struct MonoMethod final {
-    void*                   pointer();
-    MonoClass*              klass() { return m_klass; }
+    void*                   address();
+    MonoClass*              klass() { return m_class; }
     const char*             name();
-    char*                   signature();
+    void                    signature(char* buff);
     MonoObject*             invoke(void* obj, void** args);
 private:
     uint16_t                m_flags;
     uint16_t                m_iflags;
     uint32_t                m_token;
-    MonoClass*              m_klass;
+    MonoClass*              m_class;
 };
 
 struct MonoAssembly {
-    MonoClass*              find_klass(const char* name_space, const char* name);
+    MonoClass*              find_class(const char* name_space, const char* name);
 };
 
 struct MonoType {

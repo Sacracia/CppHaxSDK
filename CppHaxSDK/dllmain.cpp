@@ -19,12 +19,9 @@ void HaxSdk::RenderMenu() {
 
 static void Start() {
 	LOG_INIT(DEBUG, true);
-	HaxSdk::InitializeMono();
-
-    MonoClass* pClass = MonoClass::find("Assembly-CSharp", "", "HeroController");
-    std::cout << pClass->find_field("wallSlash")->offset();
-
-	//HaxSdk::ImplementImGui(GraphicsApi_DirectX11 | GraphicsApi_DirectX12);
+	HaxSdk::InitializeBackend();
+    HaxSdk::InitializeUnity();
+	HaxSdk::ImplementImGui(GraphicsApi_DirectX11 | GraphicsApi_DirectX12);
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {

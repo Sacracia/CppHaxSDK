@@ -25,21 +25,21 @@
 #pragma comment(lib, "d3d12.lib")
 
 #ifdef _WIN64
-#include "../third_party/detours/x64/detours.h"
+#include "third_party/detours/x64/detours.h"
 #pragma comment(lib, "third_party/detours/x64/detours.lib")
 #else
-#include "../third_party/detours/x86/detours.h"
+#include "third_party/detours/x86/detours.h"
 #pragma comment(lib, "third_party/detours/x86/detours.lib")
 #endif
 
-#include "../third_party/imgui/imgui.h"
-#include "../third_party/imgui/imgui_internal.h"
-#include "../third_party/imgui/backend/imgui_impl_dx9.h"
-#include "../third_party/imgui/backend/imgui_impl_dx10.h"
-#include "../third_party/imgui/backend/imgui_impl_dx11.h"
-#include "../third_party/imgui/backend/imgui_impl_dx12.h"
-#include "../third_party/imgui/backend/imgui_impl_win32.h"
-#include "../third_party/imgui/backend/imgui_impl_opengl3.h"
+#include "third_party/imgui/imgui.h"
+#include "third_party/imgui/imgui_internal.h"
+#include "third_party/imgui/backend/imgui_impl_dx9.h"
+#include "third_party/imgui/backend/imgui_impl_dx10.h"
+#include "third_party/imgui/backend/imgui_impl_dx11.h"
+#include "third_party/imgui/backend/imgui_impl_dx12.h"
+#include "third_party/imgui/backend/imgui_impl_win32.h"
+#include "third_party/imgui/backend/imgui_impl_opengl3.h"
 
 #include "logger/logger.h"
 #include "globals.h"
