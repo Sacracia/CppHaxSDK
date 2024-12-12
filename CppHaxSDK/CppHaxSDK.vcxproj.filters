@@ -120,7 +120,10 @@
     <ClInclude Include="unity\haxsdk_unity_data.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="cheat\game_data.h">
+    <ClInclude Include="cheat\cheat_data.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="cheat\cheat.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -180,6 +183,9 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="unity\haxsdk_unity.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="cheat\cheat.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

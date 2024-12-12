@@ -2,11 +2,13 @@
 
 #include <stdint.h>
 
+//-------------------------------------------------------------------------
+// [SECTION] FORWARD DECLARATIONS OF BASE STRUCTURES
+//-------------------------------------------------------------------------
 struct  MonoObject;
 struct  MonoThreadsSync;
 struct  MonoArrayBounds;
 struct  MonoType;
-//struct MonoArray;
 struct  MonoString;
 struct  MonoClassField;
 struct  MonoMethod;
@@ -24,9 +26,13 @@ typedef MonoObject BackendObject;
 typedef MonoReflectionType SystemType;
 
 namespace HaxSdk {
-    void InitializeBackend();
+    void InitializeBackendData();
     void AttachToThread();
 }
+
+//-------------------------------------------------------------------------
+// [SECTION] FORWARD DECLARATIONS OF BASE STRUCTURES
+//-------------------------------------------------------------------------
 
 struct MonoObject {
     static MonoObject*      alloc(MonoClass* klass);

@@ -13,10 +13,10 @@
 #define HAXSDK_FIELD_OFFSET(a, n, c, f)    static int c ## __ ## f
 #include "../unity/haxsdk_unity_data.h"
 
-void HaxSdk::InitializeUnity() {
+void HaxSdk::InitializeUnityData() {
     #define HAXSDK_FUNCTION(a, n, c, m, s)     c ## __ ## m = BackendClass::find(a, n, #c)->find_method(#m, s)
-    #define HAXSDK_STATIC_FIELD(a, n, c, f, t) c ## __ ## f = (t*)BackendClass::find(a, n, #c)->find_static_field(f)
-    #define HAXSDK_FIELD_OFFSET(a, n, c, f)    c ## __ ## f = BackendClass::find(a, n, #c)->find_field(f)->offset()
+    #define HAXSDK_STATIC_FIELD(a, n, c, f, t) c ## __ ## f = (t*)BackendClass::find(a, n, #c)->find_static_field(#f)
+    #define HAXSDK_FIELD_OFFSET(a, n, c, f)    c ## __ ## f = BackendClass::find(a, n, #c)->find_field(#f)->offset()
     #include "haxsdk_unity_data.h"
 }
 

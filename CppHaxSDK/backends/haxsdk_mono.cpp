@@ -78,7 +78,7 @@ static void     InitializeMono(HMODULE hMono);
 static HMODULE  GetMonoHandle();
 
 namespace HaxSdk {
-    void InitializeBackend() {
+    void InitializeBackendData() {
         HMODULE hMono = GetMonoHandle();
         HAX_ASSERT(hMono, "Seems like game doesnt use mono.");
         InitializeMono(hMono);
@@ -208,7 +208,6 @@ MonoMethod* MonoClass::find_method(const char* name, const char* sig) {
         if (strcmp(pMethod->name(), name) == 0) {
             memset(buff, 0, 255);
             pMethod->signature(buff);
-            std::cout << buff << '\n';
             if (strcmp(buff, sig) == 0)
                 return pMethod;
         }

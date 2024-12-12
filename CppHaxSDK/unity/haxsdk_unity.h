@@ -7,7 +7,7 @@
 #endif
 
 namespace HaxSdk {
-    void InitializeUnity();
+    void InitializeUnityData();
 }
 
 template <typename T>
@@ -49,10 +49,12 @@ struct Transform {
 struct Component : BackendObject {
     Transform*          get_transform();
 };
+
 struct Camera {
     static Camera*      main();
     Vector3             WorldToScreenPoint(Vector3 position);
 };
+
 struct Screen {
     static int          width();
     static int          height();

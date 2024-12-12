@@ -3,25 +3,13 @@
 #include <iostream>
 
 #include "haxsdk.h"
-#include "third_party/imgui/imgui.h"
-
-void HaxSdk::ApplyStyle() {
-
-}
-
-void HaxSdk::RenderBackground() {
-    
-}
-
-void HaxSdk::RenderMenu() {
-    ImGui::ShowDemoWindow();
-}
+#include "cheat/cheat.h"
 
 static void Start() {
 	LOG_INIT(DEBUG, true);
-	HaxSdk::InitializeBackend();
-    HaxSdk::InitializeUnity();
-	HaxSdk::ImplementImGui(GraphicsApi_DirectX11 | GraphicsApi_DirectX12);
+	HaxSdk::InitializeBackendData();
+    HaxSdk::InitializeUnityData();
+    HaxSdk::InitializeGameData();
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {

@@ -4,6 +4,7 @@
 #error Either HAX_MONO or HAX_IL2CPP must be specified
 #endif
 
+#include "globals.h"
 #include "logger/logger.h"
 #include "haxsdk_gui.h"
 #include "unity/haxsdk_unity.h"

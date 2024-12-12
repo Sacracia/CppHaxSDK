@@ -1,0 +1,14 @@
+#ifdef HAXSDK_STATIC_FIELD
+
+#undef HAXSDK_STATIC_FIELD
+#endif
+
+#ifdef HAXSDK_FIELD_OFFSET
+
+#undef HAXSDK_FIELD_OFFSET
+#endif
+
+#ifdef HAXSDK_FUNCTION
+
+#undef HAXSDK_FUNCTION
+#endif

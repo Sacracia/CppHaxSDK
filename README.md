@@ -28,18 +28,21 @@
     - [X] String
     - [ ] Dictionary
   - [X] Демонстрационный мод
+- SDK для IL2CPP
+  - [X] Работа с функциями игры
+  - [X] Работа с полями классов
 
 ## Демонстрационный мод
-![Alt text](images/MonoCheatDemo.png)
+![Alt text](Images/MonoCheatDemo.png)
 
 ## Демонстрация работы хуков разных графических API
 ### Stardew Valley (OpenGL)
-![Alt text](images/StardewValley(OpenGL).png)
+![Alt text](Images/StardewValley(OpenGL).png)
 ### Spelunky (DirectX 9)
-![Alt text](images/Spelunky(D3D9).png)
+![Alt text](Images/Spelunky(D3D9).png)
 ### Battlefield Bad Company 2 (DirectX 10)
-![Alt text](images/BFBC2(D3D10).png)
+![Alt text](Images/BFBC2(D3D10).png)
 ### Vampire Survivors (DirectX 11)
-![Alt text](images/VampireSurvivors(D3D11).png)
+![Alt text](Images/VampireSurvivors(D3D11).png)
 ### Galactic Survivors (DirectX 12)
-![Alt text](images/DeepRockGalactic(D3D12).png)
+![Alt text](Images/DeepRockGalactic(D3D12).png)

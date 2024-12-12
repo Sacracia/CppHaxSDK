@@ -2,6 +2,9 @@
 
 #include <stdint.h>
 
+//-------------------------------------------------------------------------
+// [SECTION] FORWARD DECLARATIONS OF BASE STRUCTURES
+//-------------------------------------------------------------------------
 struct  Il2CppObject;
 struct  Il2CppMethod;
 struct  Il2CppClass;
@@ -15,11 +18,18 @@ typedef Il2CppObject BackendObject;
 typedef Il2CppMethod BackendMethod;
 typedef Il2CppObject SystemType;
 
+
+//-------------------------------------------------------------------------
+// [SECTION] FUNCTIONS
+//-------------------------------------------------------------------------
 namespace HaxSdk {
-    void InitializeBackend();
+    void InitializeBackendData();
     void AttachToThread();
 }
 
+//-------------------------------------------------------------------------
+// [SECTION] DEFINITIONS OF BASE STRUCTURES
+//-------------------------------------------------------------------------
 struct Il2CppObject {
     Il2CppClass*            klass() { return m_class; }
 public:
