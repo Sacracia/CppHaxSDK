@@ -3,13 +3,26 @@
 #include <iostream>
 
 #include "haxsdk.h"
-#include "cheat/cheat.h"
+
+void HaxSdk::ApplyStyle() {
+
+}
+
+void HaxSdk::RenderBackground() {
+
+}
+
+void HaxSdk::RenderMenu() {
+
+}
 
 static void Start() {
 	LOG_INIT(DEBUG, true);
 	HaxSdk::InitializeBackendData();
     HaxSdk::InitializeUnityData();
-    HaxSdk::InitializeGameData();
+
+    Class* pClass = Class::Find("VampireSurvivors.Runtime", "VampireSurvivors.Framework", "GameManager");
+    std::cout << pClass->FindField("_signalBus")->Offset();
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {

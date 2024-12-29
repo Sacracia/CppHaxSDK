@@ -608,9 +608,11 @@ namespace dx11 {
         ID3D11Texture2D* pBackBuffer = NULL;
         pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
         if (pBackBuffer && g_pDevice) {
-            DXGI_SWAP_CHAIN_DESC sd;
-            pSwapChain->GetDesc(&sd);
-            g_pDevice->CreateRenderTargetView(pBackBuffer, nullptr, &g_pRenderTarget);
+            D3D11_RENDER_TARGET_VIEW_DESC desc = {}; // to fix menu brightness
+            memset(&desc, 0, sizeof(desc));
+            desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+            g_pDevice->CreateRenderTargetView(pBackBuffer, &desc, &g_pRenderTarget);
             pBackBuffer->Release();
         }
     }

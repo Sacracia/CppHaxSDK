@@ -159,7 +159,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>HAX_MONO</PreprocessorDefinitions>
+      <PreprocessorDefinitions>HAX_IL2CPP</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -180,8 +180,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="cheat\cheat.h" />
-    <ClInclude Include="cheat\cheat_data.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="backends\haxsdk_il2cpp.h" />
     <ClInclude Include="backends\haxsdk_mono.h" />
@@ -219,7 +217,6 @@
     <ClInclude Include="unity\haxsdk_unity_data.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cheat\cheat.cpp" />
     <ClCompile Include="globals.cpp" />
     <ClCompile Include="backends\haxsdk_il2cpp.cpp" />
     <ClCompile Include="backends\haxsdk_mono.cpp" />

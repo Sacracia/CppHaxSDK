@@ -5,135 +5,166 @@
 //-------------------------------------------------------------------------
 // [SECTION] FORWARD DECLARATIONS OF BASE STRUCTURES
 //-------------------------------------------------------------------------
-struct  Il2CppObject;
-struct  Il2CppMethod;
-struct  Il2CppClass;
-struct  Il2CppType;
-struct  Il2CppParameter;
-struct  Il2CppClassField;
-struct  Il2CppImage;
-struct  Il2CppThread;
-typedef Il2CppClass  BackendClass;
-typedef Il2CppObject BackendObject;
-typedef Il2CppMethod BackendMethod;
-typedef Il2CppObject SystemType;
+namespace System {
+    struct Object;
+    struct Type;
+    struct String;
+    template <class T> 
+    struct Array;
+    template <class T> 
+    struct List;
+    template <class TKey, class TValue> 
+    struct Dictionary;
+}
+struct Field;
+struct Method;
+struct Assembly;
+struct Class;
+struct Type;
+struct Image;
+struct Thread;
 
-
-//-------------------------------------------------------------------------
-// [SECTION] FUNCTIONS
-//-------------------------------------------------------------------------
 namespace HaxSdk {
     void InitializeBackendData();
     void AttachToThread();
 }
 
-//-------------------------------------------------------------------------
-// [SECTION] DEFINITIONS OF BASE STRUCTURES
-//-------------------------------------------------------------------------
-struct Il2CppObject {
-    Il2CppClass*            klass() { return m_class; }
-public:
-    static Il2CppObject*    alloc(Il2CppClass* klass);
-    void*                   unbox();
+struct System::Object {
+    static System::Object*  New(Class* pClass);
+    static System::Object*  NewI(Class* pClass);
+    void*                   Unbox();
+    Class*                  Klass() { return m_class; }
 private:
-    Il2CppClass*            m_class;
+    Class*                  m_class;
     void*                   m_monitor;
 };
 
-struct Il2CppMethod final {
-    void*                   address() { return m_address; }
-    Il2CppClass*            klass();
-    const char*             name();
-    void                    signature(char* buff);
-public:
-    Il2CppObject*           invoke(void* obj, void** args);
+struct System::String : System::Object {
+    static System::String*  New(const char* data);
+    static System::String*  Concat(System::String* s1, System::String* s2);
+    wchar_t*                Data()   { return m_chars; }
+    int32_t                 Length() { return m_length; }
+    char*                   UTF8();
 private:
-    void*                   m_address;
+    int32_t                 m_length;
+    wchar_t                 m_chars[32];
 };
 
-struct Il2CppType {
-    Il2CppObject* system_type();
+template <class T>
+struct System::Array : System::Object {
+    uintptr_t               Length() { return m_length; }
+    T*                      Data() { return m_vector; }
 private:
-    void*                   data;
-    unsigned int            attrs     : 16;
-    int                     type      : 8;
-    unsigned int            num_mods  : 5;
-    unsigned int            byref     : 1;
-    unsigned int            pinned    : 1;
-    unsigned int            valuetype : 1;
+    void*                   m_bounds;
+    uintptr_t               m_length;
+    T                       m_vector[32]; //!!!!!
 };
 
-struct Il2CppClass final {
-    const char*             name()      { return m_name; }
-    const char*             namespaze() { return m_namespace; }
-    Il2CppType*             type();
-public:
-    static Il2CppClass*     find(const char* assembly, const char* name_space, const char* name);
-    Il2CppMethod*           find_method(const char* name, const char* params);
-    void*                   find_static_field(const char* name);
-    Il2CppClassField*       find_field(const char* name);
+template <class T>
+struct System::List : System::Object {
+    int32_t                 Lenght() { return m_size; }
+    T*                      Data() { return m_items->Data(); }
 private:
-    Il2CppImage*            m_image;
-    void*                   m_gc_desc;
-    const char*             m_name;
-    const char*             m_namespace;
-    Il2CppType              m_byval_arg;
-    Il2CppType              m_this_arg;
-    void*                   __space[15];
-    void*                   m_static_fields;
-    //...
+    System::Array<T>*       m_items;
+    int32_t                 m_size;
+    int32_t                 m_version;
+    void*                   m_syncRoot;
 };
 
-struct Il2CppClassField {
-    int                     offset() { return m_offset; }
-    const char*             name()   { return m_name; }
-    Il2CppType*             type()   { return m_type; }
-private:
-    char*                   m_name;
-    Il2CppType*             m_type;
-    Il2CppClass*            m_parent;
-    int32_t                 m_offset;
-    uint32_t                m_token;
+template <class TKey, class TValue>
+struct System::Dictionary : System::Object {
+    bool                    ContainsKey(TKey key);
+    bool                    ContainsKey(TKey* key);
 };
 
-struct Il2CppAssembly {
-    friend struct           Il2CppDomain;
-    Il2CppClass*            find_class(const char* name_space, const char* name);
+struct Domain {
+    static Domain*          Current();
+    static Assembly*        FindAssembly(const char* assembly);
+    static bool             HasAssembly(const char* assembly);
+    void                    AttachThread();
+};
+
+struct Assembly {
+    const char*             Name() { return m_name; }
+    Class*                  FindClass(const char* name_space, const char* name);
 private:
-    Il2CppImage*            m_image;
+    Image*                  m_image;
     uint32_t                m_token;
     int32_t                 m_referencedAssemblyStart;
     int32_t                 m_referencedAssemblyCount;
     const char*             m_name;
-    //...
 };
 
-struct Il2CppDomain {
-    static Il2CppDomain*    current();
-    Il2CppAssembly*         find_assembly(const char* assembly);
-    void                    attach_thread();
-};
-
-struct Il2CppArrayBounds {
-    size_t                  m_length;
-    int32_t                 m_lower_bound;
-};
-
-template <class T>
-struct Il2CppArray {
-    Il2CppObject            m_object;
-    Il2CppArrayBounds*      m_bounds;
-    size_t                  m_max_length;
-    T                       m_vector[32];
-};
-
-struct Il2CppString {
-    wchar_t*                data()   { return m_chars; }
-    int32_t                 length() { return m_length; }
-public:
-    static Il2CppString*    alloc(const char* raw);
+struct Type {
+    System::Type* SystemType();
 private:
-    Il2CppObject            m_object;
-    int32_t                 m_length;
-    wchar_t                 m_chars[32];
+    void* m_data;
+    unsigned int            m_attrs : 16;
+    int                     m_type : 8;
+    unsigned int            m_num_mods : 5;
+    unsigned int            m_byref : 1;
+    unsigned int            m_pinned : 1;
+    unsigned int            m_valuetype : 1;
 };
+
+struct Class {
+    static Class*           Find(const char* assembly, const char* name_space, const char* name);
+    const char*             Name() { return m_name; }
+    const char*             Namespace() { return m_namespace; }
+    System::Type*           SystemType();
+    Method*                 FindMethod(const char* name, const char* params);
+    Method*                 FindMethod(const char* name);
+    void*                   FindStaticField(const char* name);
+    Field*                  FindField(const char* name);
+private:
+    Image*                  m_image;
+    void*                   m_gcDesc;
+    const char*             m_name;
+    const char*             m_namespace;
+    Type                    m_byvalArg;
+    Type                    m_thisArg;
+    void*                   __space[15];
+    void*                   m_staticFields;
+};
+
+struct Method {
+    friend struct Class;
+public:
+    Method() = default;
+public:
+    void*&                  Ptr()   { return m_ptr; }
+    Class*                  Klass();
+    const char*             Name();
+    System::Object*         Invoke(void* obj, void** args);
+private:
+    void                    Signature(char* buff);
+private:
+    void*                   m_ptr;
+};
+
+struct Field {
+    int32_t                 Offset() { return m_offset; }
+    const char*             Name()   { return m_name; }
+    //MonoType*             type()   { return m_type; } 
+private:
+    const char*             m_name;
+    Type*                   m_type;
+    Class*                  m_parent;
+    int32_t                 m_offset;
+    uint32_t                m_token;
+};
+
+
+template<class TKey, class TValue>
+inline bool System::Dictionary<TKey, TValue>::ContainsKey(TKey key) {
+    static Method pFunc = this->Klass()->FindMethod("ContainsKey");
+    void* args[1] = { &key };
+    return *(bool*)pFunc.Invoke(this, args)->Unbox();
+}
+
+template<class TKey, class TValue>
+inline bool System::Dictionary<TKey,TValue>::ContainsKey(TKey* key) {
+    static Method pFunc = this->Klass()->FindMethod("ContainsKey");
+    void* args[1] = { key };
+    return *(bool*)pFunc.Invoke(this, args)->Unbox();
+}

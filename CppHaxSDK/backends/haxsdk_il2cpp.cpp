@@ -1,127 +1,135 @@
-//-------------------------------------------------------------------------
-// [SECTION] INCLUDES
-//-------------------------------------------------------------------------
-
 #ifdef HAX_IL2CPP
 #include "haxsdk_il2cpp.h"
 
-#define WIN32_LEAN_AND_MEAN // Reduce the size of the Win32 header
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <TlHelp32.h>
 
 #include <iostream>
 #include <format>
 
-// 64 bits platforms use UnityEngine.CoreModule.dll instead of UnityEngine.dll 
-// as a core library
-#ifdef _WIN64
-#define UNITY_CORE_ASSEMBLY "UnityEngine.CoreModule"
-#else
-#define UNITY_CORE_ASSEMBLY "UnityEngine"
-#endif
-
-// Custom assertion that can show chars as text.
-// Default assertion takes only wide chars.
 #define HAX_ASSERT(expr, msg) if (!(expr)) {                                                   \
                                  MessageBoxA(NULL, msg, "Hax assertion failed", MB_ICONERROR); \
                                  ExitProcess(-1);                                              \
                               }
-// Finds IL2CPP api functions. 
-// Some games use mono functions mixed with il2cpp.
-// f - api function name
-// i - function from il2cpp
-// m - function from mono (if il2cpp function not found)
-#define HAX_IL2CPP_PROC(f, i, m) f = (t ## _ ## f)(GetIl2CppProc(hGameAssembly, i, m))
+#define HAX_IL2CPP_PROC(n)    n = reinterpret_cast<t ## _ ## n>(GetProcAddress(hGameAssembly, #n));\
+                              HAX_ASSERT(n, #n)
 
-//-------------------------------------------------------------------------
-// [SECTION] FORWARD DECLARATIONS
-//-------------------------------------------------------------------------
-// 
-// Types for il2cpp api functions
-using t_il2cpp_domain_get                   = Il2CppDomain* (*)();
-using t_il2cpp_thread_attach                = Il2CppThread* (*)(Il2CppDomain*);
-using t_il2cpp_object_new                   = Il2CppObject* (*)(Il2CppClass*);
-using t_il2cpp_object_unbox                 = void* (*)(Il2CppObject*);
-using t_il2cpp_type_get_name                = char* (*)(Il2CppType*);
-using t_il2cpp_method_get_param_count       = uint32_t (*)(Il2CppMethod*);
-using t_il2cpp_method_get_param             = Il2CppType* (*)(Il2CppMethod*, uint32_t);
-using t_il2cpp_method_get_name              = const char* (*)(Il2CppMethod*);
-using t_il2cpp_runtime_invoke               = Il2CppObject* (*)(Il2CppMethod*, void*, void**, void*);
-using t_il2cpp_class_get_type               = Il2CppType* (*)(Il2CppClass*);
-using t_il2cpp_domain_assembly_open         = Il2CppAssembly* (*)(Il2CppDomain*, const char*);
-using t_il2cpp_class_get_methods            = Il2CppMethod* (*)(Il2CppClass*, void**);
-using t_il2cpp_class_get_field_from_name    = Il2CppClassField* (*)(Il2CppClass*, const char*);
-using t_il2cpp_type_get_object              = Il2CppObject* (*)(Il2CppType*);
-using t_il2cpp_class_from_name              = Il2CppClass* (*)(Il2CppImage*, const char*, const char*);
-using t_il2cpp_domain_get_assemblies        = Il2CppAssembly** (*)(Il2CppDomain*, size_t*);
-using t_il2cpp_string_new                   = Il2CppString* (*)(const char*);
-using t_il2cpp_method_get_return_type       = Il2CppType* (*)(Il2CppMethod*);
-using t_il2cpp_method_get_class             = Il2CppClass* (*)(Il2CppMethod*);
-// Il2cpp api functions pointers
-static t_il2cpp_domain_get                  il2cpp_domain_get;
-static t_il2cpp_thread_attach               il2cpp_thread_attach;
+// object
+using t_il2cpp_object_new                   = System::Object* (*)(Class* pClass);
+using t_il2cpp_object_unbox                 = void* (*)(System::Object* obj);
+using t_il2cpp_runtime_object_init          = void (*)(System::Object* obj);
+
+// domain
+using t_il2cpp_domain_get                   = Domain* (*)();
+using t_il2cpp_domain_get_assemblies        = Assembly** (*)(Domain* domain, size_t * size);
+
+// thread
+using t_il2cpp_thread_attach                = Thread* (*)(Domain* domain);
+
+// assembly
+using t_il2cpp_assembly_get_image           = Image* (*)(Assembly* assembly);
+
+//class
+using t_il2cpp_class_from_name              = Class* (*)(Image* image, const char* namespaze, const char* name);
+using t_il2cpp_class_get_type               = Type* (*)(Class* pClass);
+using t_il2cpp_class_get_methods            = Method* (*)(Class* pClass, void** iter);
+
+// type
+using t_il2cpp_type_get_object              = System::Type* (*)(Type* type);
+using t_il2cpp_type_get_name                = const char* (*)(Type* type);
+
+// field
+using t_il2cpp_class_get_field_from_name    = Field* (*)(Class* pClass, const char* name);
+
+// method
+using t_il2cpp_runtime_invoke               = System::Object* (*)(Method* pMethod, void* obj, void** params, void** exc);
+using t_il2cpp_method_get_param_count       = int32_t (*)(Method* pMethod);
+using t_il2cpp_method_get_param             = Type* (*)(Method* method, uint32_t index);
+using t_il2cpp_method_get_class             = Class* (*)(Method* pMethod);
+using t_il2cpp_method_get_name              = const char* (*)(Method* pMethod);
+using t_il2cpp_method_get_return_type       = Type* (*)(Method* pMethod);
+
+// string
+using t_il2cpp_string_new                   = System::String* (*)(const char* str);
+
+
+// object
 static t_il2cpp_object_new                  il2cpp_object_new;
 static t_il2cpp_object_unbox                il2cpp_object_unbox;
+static t_il2cpp_runtime_object_init         il2cpp_runtime_object_init;
+
+// domain
+static t_il2cpp_domain_get                  il2cpp_domain_get;
+static t_il2cpp_domain_get_assemblies       il2cpp_domain_get_assemblies;
+
+//thread
+static t_il2cpp_thread_attach               il2cpp_thread_attach;
+
+// assembly
+static t_il2cpp_assembly_get_image          il2cpp_assembly_get_image;
+
+// class
+static t_il2cpp_class_from_name             il2cpp_class_from_name;
+static t_il2cpp_class_get_type              il2cpp_class_get_type;
+static t_il2cpp_class_get_methods           il2cpp_class_get_methods;
+
+// type
+static t_il2cpp_type_get_object             il2cpp_type_get_object;
 static t_il2cpp_type_get_name               il2cpp_type_get_name;
+
+// field
+static t_il2cpp_class_get_field_from_name   il2cpp_class_get_field_from_name;
+
+// method
+static t_il2cpp_runtime_invoke              il2cpp_runtime_invoke;
 static t_il2cpp_method_get_param_count      il2cpp_method_get_param_count;
 static t_il2cpp_method_get_param            il2cpp_method_get_param;
-static t_il2cpp_method_get_name             il2cpp_method_get_name;
 static t_il2cpp_method_get_class            il2cpp_method_get_class;
-static t_il2cpp_runtime_invoke              il2cpp_runtime_invoke;
-static t_il2cpp_class_get_type              il2cpp_class_get_type;
-static t_il2cpp_domain_assembly_open        il2cpp_domain_assembly_open;
-static t_il2cpp_class_get_methods           il2cpp_class_get_methods;
-static t_il2cpp_class_get_field_from_name   il2cpp_class_get_field_from_name;
-static t_il2cpp_type_get_object             il2cpp_type_get_object;
-static t_il2cpp_class_from_name             il2cpp_class_from_name;
-static t_il2cpp_domain_get_assemblies       il2cpp_domain_get_assemblies;
-static t_il2cpp_string_new                  il2cpp_string_new;
+static t_il2cpp_method_get_name             il2cpp_method_get_name;
 static t_il2cpp_method_get_return_type      il2cpp_method_get_return_type;
 
+// string
+static t_il2cpp_string_new                  il2cpp_string_new;
+
+
 static void     InitializeIl2Cpp(HMODULE hGameAssembly); // Function asserts and finds all IL2CPP api functions 
-static HMODULE  GetGameAssemblyHandle();                 // Function finds handle for GameAssembly.dll. 
-                                                         // It is supposed all il2cpp games use this module.
-static FARPROC  GetIl2CppProc(HMODULE hGameAssembly, const char* il2cppProc, const char* monoProc); // Function finds a single IL2CPP api function.
+static HMODULE  GetGameAssemblyHandle();                 // Function finds handle for GameAssembly.dll.
 
-
-//-------------------------------------------------------------------------
-// [SECTION] FUNCTIONS DEFINITION
-//-------------------------------------------------------------------------
 namespace HaxSdk {
-    // Function initializes everything to let user code run
     void InitializeBackendData() {
         HMODULE hGameAssembly = GetGameAssemblyHandle();
-        HAX_ASSERT(hGameAssembly, "Seems like game doesnt have GameAssembly.");
+        HAX_ASSERT(hGameAssembly, "Seems like game doesnt use il2cpp.");
         InitializeIl2Cpp(hGameAssembly);
         AttachToThread();
     }
 
-    // Register the thread with Mono
     void AttachToThread() {
-        Il2CppDomain::current()->attach_thread();
+        Domain::Current()->AttachThread();
     }
 }
 
 static void InitializeIl2Cpp(HMODULE hGameAssembly) {
-    HAX_IL2CPP_PROC(il2cpp_domain_get, "il2cpp_domain_get", "");
-    HAX_IL2CPP_PROC(il2cpp_thread_attach, "il2cpp_thread_attach", "");
-    HAX_IL2CPP_PROC(il2cpp_object_new, "il2cpp_object_new", "");
-    HAX_IL2CPP_PROC(il2cpp_object_unbox, "il2cpp_object_unbox", "");
-    HAX_IL2CPP_PROC(il2cpp_type_get_name, "il2cpp_type_get_name", "");
-    HAX_IL2CPP_PROC(il2cpp_method_get_param_count, "il2cpp_method_get_param_count", "");
-    HAX_IL2CPP_PROC(il2cpp_method_get_param, "il2cpp_method_get_param", "");
-    HAX_IL2CPP_PROC(il2cpp_method_get_name, "il2cpp_method_get_name", "");
-    HAX_IL2CPP_PROC(il2cpp_method_get_class, "il2cpp_method_get_class", "");
-    HAX_IL2CPP_PROC(il2cpp_method_get_return_type, "il2cpp_method_get_return_type", "");
-    HAX_IL2CPP_PROC(il2cpp_runtime_invoke, "il2cpp_runtime_invoke", "");
-    HAX_IL2CPP_PROC(il2cpp_class_get_type, "il2cpp_class_get_type", "");
-    HAX_IL2CPP_PROC(il2cpp_domain_assembly_open, "il2cpp_domain_assembly_open", "");
-    HAX_IL2CPP_PROC(il2cpp_class_get_methods, "il2cpp_class_get_methods", "");
-    HAX_IL2CPP_PROC(il2cpp_class_get_field_from_name, "il2cpp_class_get_field_from_name", "");
-    HAX_IL2CPP_PROC(il2cpp_type_get_object, "il2cpp_type_get_object", "");
-    HAX_IL2CPP_PROC(il2cpp_class_from_name, "il2cpp_class_from_name", "");
-    HAX_IL2CPP_PROC(il2cpp_domain_get_assemblies, "il2cpp_domain_get_assemblies", "");
-    HAX_IL2CPP_PROC(il2cpp_string_new, "il2cpp_string_new", "");
+    HAX_IL2CPP_PROC(il2cpp_object_new);
+    HAX_IL2CPP_PROC(il2cpp_object_unbox);
+    HAX_IL2CPP_PROC(il2cpp_runtime_object_init);
+    HAX_IL2CPP_PROC(il2cpp_domain_get);
+    HAX_IL2CPP_PROC(il2cpp_domain_get_assemblies);
+    HAX_IL2CPP_PROC(il2cpp_thread_attach);
+    HAX_IL2CPP_PROC(il2cpp_assembly_get_image);
+    HAX_IL2CPP_PROC(il2cpp_class_from_name);
+    HAX_IL2CPP_PROC(il2cpp_class_get_type);
+    HAX_IL2CPP_PROC(il2cpp_class_get_methods);
+    HAX_IL2CPP_PROC(il2cpp_type_get_object);
+    HAX_IL2CPP_PROC(il2cpp_type_get_name);
+    HAX_IL2CPP_PROC(il2cpp_class_get_field_from_name);
+    HAX_IL2CPP_PROC(il2cpp_runtime_invoke);
+    HAX_IL2CPP_PROC(il2cpp_method_get_param_count);
+    HAX_IL2CPP_PROC(il2cpp_method_get_param);
+    HAX_IL2CPP_PROC(il2cpp_method_get_class);
+    HAX_IL2CPP_PROC(il2cpp_method_get_name);
+    HAX_IL2CPP_PROC(il2cpp_method_get_return_type);
+    HAX_IL2CPP_PROC(il2cpp_string_new);
 }
 
 static HMODULE GetGameAssemblyHandle() {
@@ -140,47 +148,118 @@ static HMODULE GetGameAssemblyHandle() {
     return 0;
 }
 
-static FARPROC GetIl2CppProc(HMODULE hGameAssembly, const char* il2cppProc, const char* monoProc) {
-    FARPROC addr = GetProcAddress(hGameAssembly, il2cppProc);
-    if (!addr)
-        addr = GetProcAddress(hGameAssembly, monoProc);
-    HAX_ASSERT(addr, il2cppProc);
-    return addr;
+System::Object* System::Object::New(Class* pClass) {
+    return il2cpp_object_new(pClass);
 }
 
-
-//-------------------------------------------------------------------------
-// [SECTION] IL2CPP STRUCTURES FUNCTIONS DEFINITION
-//-------------------------------------------------------------------------
-Il2CppObject* Il2CppObject::alloc(Il2CppClass* klass) {
-    return il2cpp_object_new(klass);
+System::Object* System::Object::NewI(Class* pClass) {
+    System::Object* pObj = il2cpp_object_new(pClass);
+    il2cpp_runtime_object_init(pObj);
+    return pObj;
 }
 
-void* Il2CppObject::unbox() {
+void* System::Object::Unbox() {
     return il2cpp_object_unbox(this);
 }
 
-const char* Il2CppMethod::name() {
-    return il2cpp_method_get_name(this);
+System::String* System::String::New(const char* data) {
+    return il2cpp_string_new(data);
 }
 
-Il2CppClass* Il2CppMethod::klass() {
-    return il2cpp_method_get_class(this);
+System::String* System::String::Concat(System::String* s1, System::String* s2) {
+    static Method* pMethod = Class::Find("mscorlib", "System", "String")->FindMethod("Concat", "System.String(System.String,System.String)");
+    void* args[] = { s1, s2 };
+    return (System::String*)pMethod->Invoke(nullptr, args);
 }
 
-Il2CppObject* Il2CppMethod::invoke(void* obj, void** args) {
+Domain* Domain::Current() {
+    return il2cpp_domain_get();
+}
+
+Assembly* Domain::FindAssembly(const char* assembly) {
+    size_t nAssemblies = 0;
+    Assembly** ppAssemblies = il2cpp_domain_get_assemblies(Domain::Current(), &nAssemblies);
+    for (size_t i = 0; i < nAssemblies; ++i) {
+        if (strcmp(ppAssemblies[i]->Name(), assembly) == 0)
+            return ppAssemblies[i];
+    }
+    HAX_ASSERT(false, std::format("Assembly {} not found", assembly).c_str());
+    return nullptr;
+}
+
+bool Domain::HasAssembly(const char* assembly) {
+    size_t nAssemblies = 0;
+    Assembly** ppAssemblies = il2cpp_domain_get_assemblies(Domain::Current(), &nAssemblies);
+    for (size_t i = 0; i < nAssemblies; ++i) {
+        if (strcmp(ppAssemblies[i]->Name(), assembly) == 0)
+            return true;
+    }
+    return false;
+}
+
+void Domain::AttachThread() {
+    il2cpp_thread_attach(this);
+}
+
+Class* Assembly::FindClass(const char* name_space, const char* name) {
+    Image* pImage = il2cpp_assembly_get_image(this);
+    Class* pClass = il2cpp_class_from_name(pImage, name_space, name);
+    HAX_ASSERT(pClass, std::format("Class {}.{} not found", name_space, name).c_str());
+    return pClass;
+}
+
+Class* Class::Find(const char* assembly, const char* name_space, const char* name) {
+    return Domain::FindAssembly(assembly)->FindClass(name_space, name);
+}
+
+System::Type* Class::SystemType() {
+    Type* pType = il2cpp_class_get_type(this);
+    return il2cpp_type_get_object(pType);
+}
+
+Method* Class::FindMethod(const char* name, const char* sig) {
+    void* iter = nullptr;
+    Method* pMethod;
+    char buff[255];
+    while (pMethod = il2cpp_class_get_methods(this, &iter)) {
+        if (strcmp(pMethod->Name(), name) == 0) {
+            memset(buff, 0, 255);
+            pMethod->Signature(buff);
+            if (strcmp(buff, sig) == 0)
+                return pMethod;
+        }
+    }
+    HAX_ASSERT(false, std::format("Method {} of {} not found in {}", name, sig, this->Name()).c_str());
+    return nullptr;
+}
+
+Method* Class::FindMethod(const char* name) {
+    void* iter = nullptr;
+    Method* pMethod;
+    while (pMethod = il2cpp_class_get_methods(this, &iter)) {
+        if (strcmp(pMethod->Name(), name) == 0)
+            return pMethod;
+    }
+    HAX_ASSERT(false, std::format("Method {} not found in {}", name, this->Name()).c_str());
+    return nullptr;
+}
+
+void* Class::FindStaticField(const char* name) {
+    int32_t offset = this->FindField(name)->Offset();
+    return (void*)((char*)this->m_staticFields + offset);
+}
+
+Field* Class::FindField(const char* name) {
+    Field* pField = il2cpp_class_get_field_from_name(this, name);
+    HAX_ASSERT(pField, std::format("Field {} not found in {}", name, this->m_name).c_str());
+    return pField;
+}
+
+System::Object* Method::Invoke(void* obj, void** args) {
     return il2cpp_runtime_invoke(this, obj, args, nullptr);
 }
 
-Il2CppType* Il2CppClass::type() {
-    return il2cpp_class_get_type(this);
-}
-
-Il2CppClass* Il2CppClass::find(const char* assembly, const char* name_space, const char* name) {
-    return Il2CppDomain::current()->find_assembly(assembly)->find_class(name_space, name);
-}
-
-void Il2CppMethod::signature(char* buff) {
+void Method::Signature(char* buff) {
     strcpy_s(buff, 255, il2cpp_type_get_name(il2cpp_method_get_return_type(this)));
     strcat_s(buff, 255, "(");
     uint32_t nParams = il2cpp_method_get_param_count(this);
@@ -194,65 +273,12 @@ void Il2CppMethod::signature(char* buff) {
     strcat_s(buff, 255, ")");
 }
 
-Il2CppMethod* Il2CppClass::find_method(const char* name, const char* sig) {
-    Il2CppMethod* pMethod;
-    void* iter = 0;
-    char buff[255];
-    while (pMethod = il2cpp_class_get_methods(this, &iter)) {
-        if (strcmp(pMethod->name(), name) == 0) {
-            memset(buff, 0, sizeof(buff));
-            pMethod->signature(buff);
-            if (strcmp(sig, buff) == 0)
-                return pMethod;
-        }
-    }
-    HAX_ASSERT(false, std::format("Method {} of {} not found in {}", name, sig, this->m_name).c_str());
-    return nullptr;
+Class* Method::Klass() {
+    return il2cpp_method_get_class(this);
 }
 
-void* Il2CppClass::find_static_field(const char* name) {
-    std::cout << std::hex << offsetof(Il2CppClass, m_static_fields) << '\n';
-    int offset = this->find_field(name)->offset();
-    return (void*)((char*)this->m_static_fields + offset);
+const char* Method::Name() {
+    return il2cpp_method_get_name(this);
 }
 
-Il2CppClassField* Il2CppClass::find_field(const char* name) {
-    Il2CppClassField* pField = il2cpp_class_get_field_from_name(this, name);
-    HAX_ASSERT(pField, std::format("Field {} not found in {}", name, this->m_name).c_str());
-    return pField;
-}
-
-Il2CppObject* Il2CppType::system_type() {
-    return il2cpp_type_get_object(this);
-}
-
-Il2CppClass* Il2CppAssembly::find_class(const char* name_space, const char* name) {
-    Il2CppClass* pClass = il2cpp_class_from_name(this->m_image, name_space, name);
-    HAX_ASSERT(pClass, std::format("Class {}.{} not found in {}", name_space, name, this->m_name).c_str());
-    return pClass;
-}
-
-Il2CppDomain* Il2CppDomain::current() {
-    return il2cpp_domain_get();
-}
-
-Il2CppAssembly* Il2CppDomain::find_assembly(const char* assembly) {
-    size_t nAssemblies;
-    Il2CppAssembly** assemblies = il2cpp_domain_get_assemblies(Il2CppDomain::current(), &nAssemblies);
-    for (int i = 0; i < nAssemblies; ++i) {
-        if (strcmp(assemblies[i]->m_name, assembly) == 0) {
-            return assemblies[i];
-        }
-    }
-    HAX_ASSERT(false, std::format("Assembly {} not found", assembly).c_str());
-    return nullptr;
-}
-
-void Il2CppDomain::attach_thread() {
-    il2cpp_thread_attach(this);
-}
-
-Il2CppString* Il2CppString::alloc(const char* raw) {
-    return il2cpp_string_new(raw);
-}
 #endif
