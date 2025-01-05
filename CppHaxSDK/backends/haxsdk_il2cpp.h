@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <string>
 
 //-------------------------------------------------------------------------
 // [SECTION] FORWARD DECLARATIONS OF BASE STRUCTURES
@@ -26,7 +27,6 @@ struct Thread;
 
 namespace HaxSdk {
     void InitializeBackendData();
-    void AttachToThread();
 }
 
 struct System::Object {
@@ -44,7 +44,7 @@ struct System::String : System::Object {
     static System::String*  Concat(System::String* s1, System::String* s2);
     wchar_t*                Data()   { return m_chars; }
     int32_t                 Length() { return m_length; }
-    char*                   UTF8();
+    std::string             UTF8();
 private:
     int32_t                 m_length;
     wchar_t                 m_chars[32];
@@ -80,13 +80,14 @@ struct System::Dictionary : System::Object {
 struct Domain {
     static Domain*          Current();
     static Assembly*        FindAssembly(const char* assembly);
-    static bool             HasAssembly(const char* assembly);
+    static Assembly*        TryFindAssembly(const char* assembly);
     void                    AttachThread();
 };
 
 struct Assembly {
     const char*             Name() { return m_name; }
     Class*                  FindClass(const char* name_space, const char* name);
+    Class*                  TryFindClass(const char* name_space, const char* name);
 private:
     Image*                  m_image;
     uint32_t                m_token;
@@ -96,9 +97,9 @@ private:
 };
 
 struct Type {
-    System::Type* SystemType();
+    System::Type*           SystemType();
 private:
-    void* m_data;
+    void*                   m_data;
     unsigned int            m_attrs : 16;
     int                     m_type : 8;
     unsigned int            m_num_mods : 5;
@@ -109,11 +110,12 @@ private:
 
 struct Class {
     static Class*           Find(const char* assembly, const char* name_space, const char* name);
+    static Class*           TryFind(const char* assembly, const char* name_space, const char* name);
     const char*             Name() { return m_name; }
     const char*             Namespace() { return m_namespace; }
     System::Type*           SystemType();
-    Method*                 FindMethod(const char* name, const char* params);
-    Method*                 FindMethod(const char* name);
+    Method                  FindMethod(const char* name, const char* params);
+    Method                  FindMethod(const char* name);
     void*                   FindStaticField(const char* name);
     Field*                  FindField(const char* name);
 private:
@@ -129,8 +131,13 @@ private:
 
 struct Method {
     friend struct Class;
+private:
+    struct Il2CppMethod {
+        void* m_ptr;
+    };
 public:
     Method() = default;
+    Method(Il2CppMethod* base) : m_base(base), m_ptr(base->m_ptr) {}
 public:
     void*&                  Ptr()   { return m_ptr; }
     Class*                  Klass();
@@ -139,13 +146,13 @@ public:
 private:
     void                    Signature(char* buff);
 private:
+    Il2CppMethod*           m_base;
     void*                   m_ptr;
 };
 
 struct Field {
     int32_t                 Offset() { return m_offset; }
     const char*             Name()   { return m_name; }
-    //MonoType*             type()   { return m_type; } 
 private:
     const char*             m_name;
     Type*                   m_type;

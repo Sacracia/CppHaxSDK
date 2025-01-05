@@ -9,10 +9,13 @@
 namespace System {
     struct Object;
     struct Type;
-    template <class T> struct Array;
     struct String;
-    template <class T> struct List;
-    template <class TKey, class TValue> struct Dictionary;
+    template <class T> 
+    struct Array;
+    template <class T> 
+    struct List;
+    template <class TKey, class TValue> 
+    struct Dictionary;
 }
 struct Field;
 struct Method;
@@ -24,7 +27,6 @@ struct Thread;
 
 namespace HaxSdk {
     void InitializeBackendData();
-    void AttachToThread();
 }
 
 struct System::Object {
@@ -35,6 +37,17 @@ struct System::Object {
 private:
     Class**                 m_class;
     void*                   m_synchronisation;
+};
+
+struct System::String : System::Object {
+    static System::String*  New(const char* data);
+    static System::String*  Concat(System::String* s1, System::String* s2);
+    wchar_t*                Data()   { return m_chars; }
+    int32_t                 Length() { return m_length; }
+    char*                   UTF8();
+private:
+    int32_t                 m_length;
+    wchar_t                 m_chars[32];
 };
 
 template <class T>
@@ -59,32 +72,38 @@ private:
     void*                   m_syncRoot;
 };
 
-struct System::String : System::Object {
-    static System::String*  New(const char* data);
-    static System::String*  Concat(System::String* s1, System::String* s2);
-    wchar_t*                Data()   { return m_chars; }
-    int32_t                 Length() { return m_length; }
-    char*                   UTF8();
-private:
-    int32_t                 m_length;
-    wchar_t                 m_chars[32];
-};
-
 template <class TKey, class TValue>
 struct System::Dictionary : System::Object {
     bool                    ContainsKey(TKey key);
     bool                    ContainsKey(TKey* key);
 };
 
-struct Field {
-    int32_t                 Offset() { return m_offset; }
-    const char*             Name()   { return m_name; }
-    //MonoType*             type()   { return m_type; } 
-private:
-    Type*                   m_type;
-    const char*             m_name;
-    Class*                  m_parent;
-    int32_t                 m_offset;
+struct Domain {
+    static Domain*          Root();
+    static Assembly*        FindAssembly(const char* assembly);
+    static Assembly*        TryFindAssembly(const char* assembly);
+    void                    AttachThread();
+};
+
+struct Assembly {
+    Class*                  FindClass(const char* name_space, const char* name);
+    Class*                  TryFindClass(const char* name_space, const char* name);
+};
+
+struct Type {
+    System::Type*           SystemType();
+};
+
+struct Class {
+    static Class*           Find(const char* assembly, const char* name_space, const char* name);
+    static Class*           TryFind(const char* assembly, const char* name_space, const char* name);
+    const char*             Name();
+    const char*             Namespace();
+    System::Type*           SystemType();
+    Method                  FindMethod(const char* name, const char* params);
+    Method                  FindMethod(const char* name);
+    void*                   FindStaticField(const char* name);
+    Field*                  FindField(const char* name);
 };
 
 struct Method {
@@ -111,30 +130,14 @@ private:
     void*                   m_ptr;
 };
 
-struct Assembly {
-    Class*                  FindClass(const char* name_space, const char* name);
-};
-
-struct Type {
-    System::Type*           SystemType();
-};
-
-struct Class {
-    static Class*           Find(const char* assembly, const char* name_space, const char* name);
-    const char*             Name();
-    const char*             Namespace();
-    System::Type*           Type();
-    Method                  FindMethod(const char* name, const char* params);
-    Method                  FindMethod(const char* name);
-    void*                   FindStaticField(const char* name);
-    Field*                  FindField(const char* name);
-};
-
-struct Domain {
-    static Domain*          Root();
-    Assembly*               FindAssembly(const char* assembly);
-    bool                    HasAssembly(const char* assembly);
-    void                    AttachThread();
+struct Field {
+    int32_t                 Offset() { return m_offset; }
+    const char*             Name()   { return m_name; }
+private:
+    Type*                   m_type;
+    const char*             m_name;
+    Class*                  m_parent;
+    int32_t                 m_offset;
 };
 
 template<class TKey, class TValue>

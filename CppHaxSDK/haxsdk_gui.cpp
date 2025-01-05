@@ -3,6 +3,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <TlHelp32.h>
+#include <fstream>
+#include <format>
 
 // opengl
 #pragma comment(lib, "OpenGL32.lib")
@@ -42,13 +44,6 @@
 #include "third_party/imgui/backend/imgui_impl_opengl3.h"
 
 #include "logger/logger.h"
-#include "globals.h"
-
-#ifdef HAX_MONO
-#include "backends/haxsdk_mono.h"
-#elif defined(HAX_IL2CPP)
-#include "backends/haxsdk_il2cpp.h"
-#endif
 
 using setCursorPos_t            = BOOL(WINAPI*)(int, int);
 using clipCursor_t              = BOOL(WINAPI*)(const RECT*);
@@ -62,6 +57,7 @@ using setRenderTargets11_t      = void(WINAPI*)(ID3D11DeviceContext*, UINT, ID3D
 using executeCommandLists_t     = void(WINAPI*)(ID3D12CommandQueue*, UINT, ID3D12CommandList*);
 using setRenderTargets12_t      = void(WINAPI*)(ID3D12GraphicsCommandList*, UINT, const D3D12_CPU_DESCRIPTOR_HANDLE*, BOOL, const D3D12_CPU_DESCRIPTOR_HANDLE*);
 
+static HaxGlobals                       g_globals;
 static GraphicsApi                      g_graphicsApi;
 static HWND                             g_dummyHWND;
 static WNDPROC                          oWndproc;
@@ -135,6 +131,7 @@ namespace dx11 {
     static void             Render(IDXGISwapChain* pSwapChain);
     static void             CreateRenderTarget(IDXGISwapChain* pSwapChain);
     static HRESULT WINAPI   HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
+    static ImTextureID      LoadTextureFromData(unsigned char* image_data, int image_width, int image_height);
 }
 namespace dx12 {
     static void             Setup();
@@ -143,6 +140,38 @@ namespace dx12 {
     static HRESULT WINAPI   HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT BufferCount, UINT Width, 
                                                 UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
     static void WINAPI      HookedExecuteCommandLists(ID3D12CommandQueue* pCommandQueue, UINT NumCommandLists, ID3D12CommandList* ppCommandLists);
+}
+
+HaxGlobals::~HaxGlobals() {
+    this->Save();
+}
+
+void HaxGlobals::Save() {
+    std::ofstream file("haxsdk.ini", std::ios::out);
+    file << std::format("Size={},{}\nKey={}\nLanguage={}", static_cast<int>(m_menuWidth), static_cast<int>(m_menuHeight), m_key, m_language).c_str();
+    file.close();
+}
+
+void HaxGlobals::Load() {
+    const std::filesystem::path ini{"haxsdk.ini"};
+    if (std::filesystem::exists(ini)) {
+        std::ifstream file("haxsdk.ini");
+        std::string line;
+        int x, y;
+        if (file.is_open()) {
+            while (getline(file, line)) {
+                if (sscanf_s(line.c_str(), "Size=%d,%d", &x, &y) == 2)  { m_menuWidth = (float)x; m_menuHeight = (float)y; }
+                if (sscanf_s(line.c_str(), "Language=%d", &x) == 1)     { m_language = x; }
+                if (sscanf_s(line.c_str(), "Key=%d", &x) == 1)          { m_key = x; }
+            }
+            printf_s("Size=%d,%d | Lang=%d | Key=%d\n", static_cast<int>(m_menuWidth), static_cast<int>(m_menuHeight), m_language, m_visible);
+            file.close();
+        }
+    }
+}
+
+HaxGlobals& HaxSdk::GetGlobals() { 
+    return g_globals; 
 }
 
 void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
@@ -211,6 +240,10 @@ void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
     }
 }
 
+ImTextureID HaxSdk::LoadTextureFromData(unsigned char* image_data, int image_width, int image_height) {
+    return dx11::LoadTextureFromData(image_data, image_width, image_height);
+}
+
 static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags) {
     static bool inited = false;
     if (!inited) {
@@ -252,7 +285,7 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
 }
 
 static void InitImGuiContext(const ImGuiContextParams& params) {
-    HaxSdk::AttachToThread();
+    HaxSdk::AttachMenuToUnityThread();
 
     HWND hwnd = 0;
     if (params.graphicsApi & GraphicsApi_OpenGL) {
@@ -295,16 +328,15 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
         ImGui::CreateContext();
         ImGui_ImplWin32_Init(hwnd);
     }
+    HaxSdk::DoOnceBeforeRendering();
 
     RECT windowRect;
     GetClientRect(hwnd, &windowRect);
-    globals::g_screenHeight = static_cast<float>(windowRect.bottom - windowRect.top);
-    globals::g_screenWidth = static_cast<float>(windowRect.right - windowRect.left);
-    LOG_DEBUG << "Game resolution is " << globals::g_screenWidth << 'x' << globals::g_screenHeight << '\n';
+    g_globals.m_screenHeight = static_cast<float>(windowRect.bottom - windowRect.top);
+    g_globals.m_screenWidth = static_cast<float>(windowRect.right - windowRect.left);
 
-    HaxSdk::ApplyStyle();
     ImGuiIO& io = ImGui::GetIO();
-    io.WantCaptureMouse = globals::g_visible;
+    io.WantCaptureMouse = true;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
     oWndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
 
@@ -322,19 +354,19 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
     io.MousePos.x = (float)position.x;
     io.MousePos.y = (float)position.y;
 
-    if (uMsg == WM_KEYUP && wParam == VK_OEM_3) { 
-        globals::g_visible = !globals::g_visible;
-        io.MouseDrawCursor = globals::g_visible;
+    if (uMsg == WM_KEYUP && wParam == g_globals.m_key) {
+        g_globals.m_visible = !g_globals.m_visible;
+        io.MouseDrawCursor = g_globals.m_visible;
     }
 
-    if (globals::g_visible) {
+    if (g_globals.m_visible) {
         RECT rect;
         GetWindowRect(hWnd, &rect);
         HookedClipCursor(&rect);
 
         ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam);
         switch (uMsg) {
-        case WM_KEYUP: if (wParam != VK_OEM_3) break;
+        case WM_KEYUP: if (wParam != g_globals.m_key) break;
         case WM_MOUSEMOVE:
         case WM_MOUSEACTIVATE:
         case WM_MOUSEHOVER:
@@ -367,11 +399,11 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 }
 
 static BOOL WINAPI HookedSetCursorPos(int X, int Y) {
-    return globals::g_visible ? true : oSetCursorPos(X, Y);
+    return g_globals.m_visible ? true : oSetCursorPos(X, Y);
 }
 
 static BOOL WINAPI HookedClipCursor(const RECT* lpRect) {
-    return oClipCursor(globals::g_visible ? NULL : lpRect);
+    return oClipCursor(g_globals.m_visible ? NULL : lpRect);
 }
 
 namespace opengl {
@@ -400,7 +432,7 @@ namespace opengl {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         HaxSdk::RenderBackground();
-        if (globals::g_visible)
+        if (g_globals.m_visible)
             HaxSdk::RenderMenu();
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -460,7 +492,7 @@ namespace dx9 {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         HaxSdk::RenderBackground();
-        if (globals::g_visible)
+        if (g_globals.m_visible)
             HaxSdk::RenderMenu();
         ImGui::EndFrame();
 
@@ -474,9 +506,9 @@ namespace dx9 {
         ImGui_ImplDX9_InvalidateDeviceObjects();
         HRESULT result = oReset(pDevice, pPresentationParameters);
         ImGui_ImplDX9_CreateDeviceObjects();
-        globals::g_screenHeight = static_cast<float>(pPresentationParameters->BackBufferHeight);
-        globals::g_screenWidth = static_cast<float>(pPresentationParameters->BackBufferWidth);
-        LOG_DEBUG << "[D3D9] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
+        g_globals.m_screenHeight = static_cast<float>(pPresentationParameters->BackBufferHeight);
+        g_globals.m_screenWidth = static_cast<float>(pPresentationParameters->BackBufferWidth);
+        LOG_DEBUG << "[D3D9] Resolution changed to " << g_globals.m_screenWidth << 'x' << g_globals.m_screenHeight << LOG_FLUSH;
         return result;
     }
 } // dx9
@@ -532,7 +564,7 @@ namespace dx10 {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         HaxSdk::RenderBackground();
-        if (globals::g_visible)
+        if (g_globals.m_visible)
             HaxSdk::RenderMenu();
         ImGui::EndFrame();
         ImGui::Render();
@@ -547,9 +579,9 @@ namespace dx10 {
             g_pRenderTarget->Release();
             g_pRenderTarget = nullptr;
         }
-        globals::g_screenHeight = static_cast<float>(height);
-        globals::g_screenWidth = static_cast<float>(width);
-        LOG_DEBUG << "[D3D10] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
+        g_globals.m_screenHeight = static_cast<float>(height);
+        g_globals.m_screenWidth = static_cast<float>(width);
+        LOG_DEBUG << "[D3D10] Resolution changed to " << g_globals.m_screenWidth << 'x' << g_globals.m_screenHeight << LOG_FLUSH;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 
@@ -632,7 +664,7 @@ namespace dx11 {
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
         HaxSdk::RenderBackground();
-        if (globals::g_visible)
+        if (g_globals.m_visible)
             HaxSdk::RenderMenu();
         ImGui::EndFrame();
         ImGui::Render();
@@ -646,10 +678,44 @@ namespace dx11 {
             g_pRenderTarget->Release();
             g_pRenderTarget = nullptr;
         }
-        LOG_DEBUG << "[D3D11] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
-        globals::g_screenHeight = static_cast<float>(height);
-        globals::g_screenWidth = static_cast<float>(width);
+        g_globals.m_screenHeight = static_cast<float>(height);
+        g_globals.m_screenWidth = static_cast<float>(width);
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
+    }
+
+    static ImTextureID LoadTextureFromData(unsigned char* image_data, int image_width, int image_height) {
+        // Create texture
+        D3D11_TEXTURE2D_DESC desc;
+        ZeroMemory(&desc, sizeof(desc));
+        desc.Width = image_width;
+        desc.Height = image_height;
+        desc.MipLevels = 1;
+        desc.ArraySize = 1;
+        desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        desc.CPUAccessFlags = 0;
+
+        ID3D11Texture2D* pTexture = NULL;
+        D3D11_SUBRESOURCE_DATA subResource;
+        subResource.pSysMem = image_data;
+        subResource.SysMemPitch = desc.Width * 4;
+        subResource.SysMemSlicePitch = 0;
+        dx11::g_pDevice->CreateTexture2D(&desc, &subResource, &pTexture);
+
+        // Create texture view
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+        ZeroMemory(&srvDesc, sizeof(srvDesc));
+        srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = desc.MipLevels;
+        srvDesc.Texture2D.MostDetailedMip = 0;
+        ID3D11ShaderResourceView* out_srv;
+        dx11::g_pDevice->CreateShaderResourceView(pTexture, &srvDesc, &out_srv);
+        pTexture->Release();
+
+        return (ImTextureID)out_srv;
     }
 } // dx11
 
@@ -801,7 +867,7 @@ namespace dx12 {
             ImGui_ImplWin32_NewFrame();
             ImGui::NewFrame();
             HaxSdk::RenderBackground();
-            if (globals::g_visible)
+            if (g_globals.m_visible)
                 HaxSdk::RenderMenu();
             ImGui::Render();
 
@@ -838,9 +904,9 @@ namespace dx12 {
                 g_mainRenderTargetResource[i] = NULL;
             }
         }
-        globals::g_screenHeight = static_cast<float>(height);
-        globals::g_screenWidth = static_cast<float>(width);
-        LOG_DEBUG << "[D3D12] Resolution changed to " << globals::g_screenWidth << 'x' << globals::g_screenHeight << LOG_FLUSH;
+        g_globals.m_screenHeight = static_cast<float>(height);
+        g_globals.m_screenWidth = static_cast<float>(width);
+        LOG_DEBUG << "[D3D12] Resolution changed to " << g_globals.m_screenWidth << 'x' << g_globals.m_screenHeight << LOG_FLUSH;
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 

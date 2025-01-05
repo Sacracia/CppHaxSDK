@@ -26,23 +26,16 @@ HAXSDK_FUNCTION_EXT(UNITY_CORE_ASSEMBLY, "UnityEngine", GameObject, ctor, ".ctor
 HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Transform, get_parent, "UnityEngine.Transform()");
 HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Transform, set_parent, "System.Void(UnityEngine.Transform)");
 HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Transform, get_forward, "UnityEngine.Vector3()");
+HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Transform, get_position, "UnityEngine.Vector3()");
+HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Transform, set_position, "System.Void(UnityEngine.Vector3)");
 HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Camera, get_main, "UnityEngine.Camera()");
+HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Camera, WorldToScreenPoint, "UnityEngine.Vector3(UnityEngine.Vector3)");
 HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Screen, get_height, "System.Int32()");
 HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Screen, get_width, "System.Int32()");
 HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Light, set_intensity, "System.Void(System.Single)");
 HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Light, get_intensity, "System.Single()");
 HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Light, set_range, "System.Void(System.Single)");
 HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Light, get_range, "System.Single()");
-
-#ifdef HAX_MONO
-HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Transform, INTERNAL_get_position, "System.Void(UnityEngine.Vector3&)");
-HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Transform, INTERNAL_set_position, "System.Void(UnityEngine.Vector3&)");
-HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Camera, INTERNAL_CALL_WorldToScreenPoint, "System.Void(UnityEngine.Camera,UnityEngine.Vector3&,UnityEngine.Vector3&)");
-#else
-HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Transform, get_position, "UnityEngine.Vector3()");
-HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Transform, set_position, "System.Void(UnityEngine.Vector3)");
-HAXSDK_FUNCTION(UNITY_CORE_ASSEMBLY, "UnityEngine", Camera, WorldToScreenPoint, "UnityEngine.Vector3(UnityEngine.Vector3)");
-#endif
 
 #undef HAXSDK_FUNCTION
 #undef HAXSDK_FUNCTION_EXT

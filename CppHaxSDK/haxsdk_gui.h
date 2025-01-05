@@ -1,5 +1,8 @@
 #pragma once
 
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
 typedef int GraphicsApi;
 
 enum GraphicsApi_ {
@@ -13,9 +16,27 @@ enum GraphicsApi_ {
     GraphicsApi_All       = (1 << 6) - 1
 };
 
+struct HaxGlobals {
+    ~HaxGlobals();
+public:
+    void    Save();
+    void    Load();
+public:
+    float   m_menuWidth = 500.f;
+    float   m_menuHeight = 600.f;
+    float   m_screenWidth = -1;
+    float   m_screenHeight = -1;
+    bool    m_visible = true;
+    int     m_language = 0;
+    int     m_key = 0xC0;
+};
+
 namespace HaxSdk {
+    HaxGlobals& GetGlobals();
+    void AttachMenuToUnityThread();
+    void DoOnceBeforeRendering();
     void RenderMenu();
     void RenderBackground();
-    void ApplyStyle();
-	void ImplementImGui(GraphicsApi);
+    void* LoadTextureFromData(unsigned char* image_data, int image_width, int image_height);
+    void ImplementImGui(GraphicsApi);
 }

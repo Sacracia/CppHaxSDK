@@ -8,6 +8,8 @@
 #include <iostream>
 #include <format>
 
+#include "../haxsdk_gui.h"
+
 #define HAX_ASSERT(expr, msg) if (!(expr)) {                                                   \
                                  MessageBoxA(NULL, msg, "Hax assertion failed", MB_ICONERROR); \
                                  ExitProcess(-1);                                              \
@@ -91,10 +93,10 @@ namespace HaxSdk {
         HMODULE hMono = GetMonoHandle();
         HAX_ASSERT(hMono, "Seems like game doesnt use mono.");
         InitializeMono(hMono);
-        AttachToThread();
+        Domain::Root()->AttachThread();
     }
 
-    void AttachToThread() {
+    void AttachMenuToUnityThread() {
         Domain::Root()->AttachThread();
     }
 }
@@ -181,7 +183,7 @@ char* System::String::UTF8() {
     return mono_string_to_utf8(this); 
 }
 
-// Dedinition: Domain
+// Definition: Domain
 Domain* Domain::Root() {
     return mono_get_root_domain();
 }
@@ -191,33 +193,41 @@ void Domain::AttachThread() {
 }
 
 Assembly* Domain::FindAssembly(const char* name) {
-    Assembly* pAssembly = mono_domain_assembly_open(this, name);
+    Assembly* pAssembly = mono_domain_assembly_open(Domain::Root(), name);
     HAX_ASSERT(pAssembly, std::format("Assembly {} not found", name).c_str());
     return pAssembly;
 }
 
-bool Domain::HasAssembly(const char* name) {
-    return mono_domain_assembly_open(this, name) != nullptr;
+Assembly* Domain::TryFindAssembly(const char* name) {
+    return mono_domain_assembly_open(Domain::Root(), name);
 }
-
 
 // Dedinition: Assembly
 Class* Assembly::FindClass(const char* name_space, const char* name) {
-    Image* pImage = mono_assembly_get_image(this);
-    Class* pClass = mono_class_from_name(pImage, name_space, name);
+    Class* pClass = TryFindClass(name_space, name);
     HAX_ASSERT(pClass, std::format("Class {}.{} not found", name_space, name).c_str());
     return pClass;
+}
+
+Class* Assembly::TryFindClass(const char* name_space, const char* name) {
+    Image* pImage = mono_assembly_get_image(this);
+    return mono_class_from_name(pImage, name_space, name);
 }
 
 
 // Dedinition: Class
 Class* Class::Find(const char* assembly, const char* name_space, const char* name) {
-    Assembly* pAssembly = mono_domain_assembly_open(mono_get_root_domain(), assembly);
-    HAX_ASSERT(pAssembly, std::format("Assembly {} not found", assembly).c_str());
-    return pAssembly->FindClass(name_space, name);
+    return Domain::Root()->FindAssembly(assembly)->FindClass(name_space, name);
 }
 
-System::Type* Class::Type() { 
+Class* Class::TryFind(const char* assembly, const char* name_space, const char* name) {
+    Assembly* pAssembly = Domain::Root()->TryFindAssembly(assembly);
+    if (!pAssembly)
+        return nullptr;
+    return pAssembly->TryFindClass(name_space, name);
+}
+
+System::Type* Class::SystemType() { 
     return mono_class_get_type(this)->SystemType(); 
 }
 
