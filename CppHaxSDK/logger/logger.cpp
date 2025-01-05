@@ -6,94 +6,71 @@
 #include <fstream>
 #include <time.h>
 #include <ctime>
-#include <iomanip>
-#include <mutex>
+#include <format>
+#include <sstream>
 
-namespace haxsdk {
-	Logger g_logger;
+class Logger {
+public:
+    void Log(std::string_view message);
+    void Init(bool useConsole);
+private:
+    std::filesystem::path m_filePath;
+    bool m_initialized = false;
+    bool m_useConsole = false;
+};
 
-	void Logger::operator<<(const haxsdk::Flush& v) {
-		Flush();
-        m_mutex.unlock();
-	}
+void Logger::Log(std::string_view message) {
+    if (!m_initialized)
+        return;
 
-	Logger& Logger::LogDebug()
-	{
-		m_curLogLevel = LogLevel::DEBUG;
-		LogHeader("DEBUG");
-		return *this;
-	}
+    auto t = std::time(nullptr);
+    struct tm newtime;
+    ::localtime_s(&newtime, &t);
+    std::stringstream ss{};
+    ss << std::put_time(&newtime, "%d-%m-%Y %H:%M:%S") << " [" << std::left << std::setw(7) << "DEBUG" << "] " << message;
 
-	Logger& Logger::LogInfo()
-	{
-		m_curLogLevel = LogLevel::INFO;
-		LogHeader("INFO");
-		return *this;
-	}
+    std::ofstream file(m_filePath, std::ios_base::app);
+    file << ss.str();
+    file.close();
 
-	Logger& Logger::LogWarning()
-	{
-		m_curLogLevel = LogLevel::WARNING;
-		LogHeader("WARNING");
-		return *this;
-	}
+    if (m_useConsole)
+        std::cout << ss.str();
+}
 
-	Logger& Logger::LogError()
-	{
-		m_curLogLevel = LogLevel::ERRO;
-		LogHeader("ERROR");
-		return *this;
-	}
+void Logger::Init(bool useConsole) {
+    if (m_initialized)
+        return;
 
-	void Logger::LogHeader(std::string_view level) {
-		m_mutex.lock();
-		auto t = std::time(nullptr);
-        struct tm newtime;
-        ::localtime_s(&newtime, &t);
-		m_ss << std::put_time(&newtime, "%d-%m-%Y %H:%M:%S") << " [" << std::left << std::setw(7) << level << "] ";
-	}
+    m_useConsole = useConsole;
+    if (useConsole) {
+        AllocConsole();
+        freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
+    }
 
-	void Logger::Flush() {
-		if (IsEmpty()) {
-			return;
-		}
-		if (m_curLogLevel >= m_level) {
-			m_ss << '\n';
-            if (m_useConsole) {
-                std::cout << m_ss.str();
-            }
+    char buff[MAX_PATH];
+    GetModuleFileName(NULL, buff, MAX_PATH);
+    const auto path = std::filesystem::path(buff);
 
-			std::ofstream file(m_filePath, std::ios::app);
-			file << m_ss.str();
-			file.close();
-		}
-		m_ss.str("");
-	}
+    const auto logPath = path.parent_path() / "haxsdk-logs.txt";
+    const auto prevLogPath = path.parent_path() / "haxsdk-prev-logs.txt";
 
-	bool Logger::IsEmpty() {
-		return m_ss.tellp() == std::streampos(0);
-	}
+    std::error_code errCode;
+    std::filesystem::remove(prevLogPath, errCode);
+    std::filesystem::rename(logPath, prevLogPath, errCode);
+    std::filesystem::remove(logPath, errCode);
 
-	void Logger::Init(LogLevel level, bool useConsole = false) {
-        m_useConsole = useConsole;
-        if (useConsole) {
-            AllocConsole();
-            freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
-        }
+    m_filePath = logPath;
+    m_initialized = true;
+}
 
-		char buff[MAX_PATH];
-		GetModuleFileName(NULL, buff, MAX_PATH);
-		const auto path = std::filesystem::path(buff);
+namespace HaxSdk {
+    static Logger g_logger;
 
-		const auto logPath = path.parent_path() / "haxsdk-logs.txt";
-		const auto prevLogPath = path.parent_path() / "haxsdk-prev-logs.txt";
+    void InitLogger(bool useConsole) {
+        g_logger.Init(useConsole);
+    }
 
-		std::error_code errCode;
-		std::filesystem::remove(prevLogPath, errCode);
-		std::filesystem::rename(logPath, prevLogPath, errCode);
-		std::filesystem::remove(logPath, errCode);
-
-		m_filePath = logPath;
-		m_level = level;
-	}
+    void Log(std::string_view message) {
+        g_logger.Log(message);
+    }
 }

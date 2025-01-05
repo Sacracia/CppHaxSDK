@@ -164,7 +164,7 @@ void HaxGlobals::Load() {
                 if (sscanf_s(line.c_str(), "Language=%d", &x) == 1)     { m_language = x; }
                 if (sscanf_s(line.c_str(), "Key=%d", &x) == 1)          { m_key = x; }
             }
-            printf_s("Size=%d,%d | Lang=%d | Key=%d\n", static_cast<int>(m_menuWidth), static_cast<int>(m_menuHeight), m_language, m_visible);
+            HaxSdk::Log(std::format("GLOBALS LOADED: Size={},{} | Lang={} | Key={}\n", static_cast<int>(m_menuWidth), static_cast<int>(m_menuHeight), m_language, m_key));
             file.close();
         }
     }
@@ -222,7 +222,7 @@ void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
                 dx12::Setup();
             }
             if (moduleName == "vulkan-1.dll" && (graphicsApi & GraphicsApi_Vulkan)) {
-                LOG_INFO << "VULKAN graphics api found" << LOG_FLUSH;
+                HaxSdk::Log("VULKAN graphics api found\n");
             }
         } while (Module32Next(snapshot, &me));
     }
@@ -254,17 +254,17 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
          DetourTransactionBegin();
          if ((g_graphicsApi & GraphicsApi_DirectX10) && pSwapChain->GetDevice(__uuidof(pDevice10), (void**)&pDevice10) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX10;
-             LOG_INFO << "GAME USES DIRECTX10" << LOG_FLUSH;
+             HaxSdk::Log("GAME USES DIRECTX10\n");
              DetourAttach(&(PVOID&)oResizeBuffers, dx10::HookedResizeBuffers);
          }
          else if ((g_graphicsApi & GraphicsApi_DirectX11) && pSwapChain->GetDevice(__uuidof(pDevice11), (void**)&pDevice11) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX11;
-             LOG_INFO << "GAME USES DIRECTX11" << LOG_FLUSH;
+             HaxSdk::Log("GAME USES DIRECTX11\n");
              DetourAttach(&(PVOID&)oResizeBuffers, dx11::HookedResizeBuffers);
          }
          else if ((g_graphicsApi & GraphicsApi_DirectX12) && pSwapChain->GetDevice(__uuidof(pDevice12), (void**)&pDevice12) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX12;
-             LOG_INFO << "GAME USES DIRECTX12" << LOG_FLUSH;
+             HaxSdk::Log("GAME USES DIRECTX12\n");
              DetourAttach(&(PVOID&)oResizeBuffers, dx12::HookedResizeBuffers);
              DetourAttach(&(PVOID&)dx12::oExecuteCommandLists, dx12::HookedExecuteCommandLists);
          }
@@ -412,10 +412,10 @@ namespace opengl {
 
         oSwapBuffers = (swapBuffers_t)GetProcAddress(module, "wglSwapBuffers");
         if (oSwapBuffers == 0) {
-            LOG_ERROR << "[OPENGL] Unable to find wglSwapBuffers. Hook not installed" << LOG_FLUSH;
+            HaxSdk::Log("[OPENGL] Unable to find wglSwapBuffers.Hook not installed\n");
             return;
         }
-        LOG_DEBUG << "[OPENGL] wglSwapBuffers address is " << oSwapBuffers << LOG_FLUSH;
+        HaxSdk::Log(std::format("[OPENGL] wglSwapBuffers address is {}\n", (void*)oSwapBuffers));
         DetourTransactionBegin();
         DetourAttach(&(PVOID&)oSwapBuffers, HookedSwapBuffers);
         DetourTransactionCommit();
@@ -425,7 +425,7 @@ namespace opengl {
         if (!ImGui::GetCurrentContext()) {
             ImGuiContextParams params = { GraphicsApi_OpenGL, nullptr, hdc, nullptr };
             InitImGuiContext(params);
-            LOG_INFO << "GAME USES OPENGL" << LOG_FLUSH;
+            HaxSdk::Log("GAME USES OPENGL\n");
         }
 
         ImGui_ImplOpenGL3_NewFrame();
@@ -447,7 +447,7 @@ namespace dx9 {
 
         LPDIRECT3D9 d3d9 = ::Direct3DCreate9(D3D_SDK_VERSION);
         if (d3d9 == NULL) {
-            LOG_ERROR << "[D3D9] Direct3DCreate9 failed. Hook not installed" << LOG_FLUSH;
+            HaxSdk::Log("[D3D9] Direct3DCreate9 failed. Hook not installed\n");
             return;
         }
         LPDIRECT3DDEVICE9 dummyDev = NULL;
@@ -458,7 +458,7 @@ namespace dx9 {
         d3dpp.hDeviceWindow = g_dummyHWND;
         HRESULT result = d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_NULLREF, d3dpp.hDeviceWindow, D3DCREATE_SOFTWARE_VERTEXPROCESSING, &d3dpp, &dummyDev);
         if (result != D3D_OK) {
-            LOG_ERROR << "[D3D9] IDirect3D9::CreateDevice returned " << result << ". Hook not installed" << LOG_FLUSH;
+            HaxSdk::Log(std::format("[D3D9] IDirect3D9::CreateDevice returned {}. Hook not installed\n", result));
             d3d9->Release();
             return;
         }
@@ -467,8 +467,8 @@ namespace dx9 {
         oEndScene = (endScene_t)pVTable[42];
         oReset = (reset_t)pVTable[16];
 
-        LOG_DEBUG << "[D3D9] IDirect3DDevice9::EndScene address is " << oEndScene << LOG_FLUSH;
-        LOG_DEBUG << "[D3D9] IDirect3DDevice9::Reset address is " << oReset << LOG_FLUSH;
+        HaxSdk::Log(std::format("[D3D9] IDirect3DDevice9::EndScene address is {}\n", (void*)oEndScene));
+        HaxSdk::Log(std::format("[D3D9] IDirect3DDevice9::Reset address is {}\n", (void*)oReset));
 
         dummyDev->Release();
         d3d9->Release();
@@ -485,7 +485,7 @@ namespace dx9 {
             inited = true;
             ImGuiContextParams params = { GraphicsApi_DirectX9, pDevice, 0, nullptr };
             InitImGuiContext(params);
-            LOG_INFO << "GAME USES DIRECTX9" << LOG_FLUSH;
+            HaxSdk::Log("GAME USES DIRECTX9\n");
         }
 
         ImGui_ImplDX9_NewFrame();
@@ -508,7 +508,7 @@ namespace dx9 {
         ImGui_ImplDX9_CreateDeviceObjects();
         g_globals.m_screenHeight = static_cast<float>(pPresentationParameters->BackBufferHeight);
         g_globals.m_screenWidth = static_cast<float>(pPresentationParameters->BackBufferWidth);
-        LOG_DEBUG << "[D3D9] Resolution changed to " << g_globals.m_screenWidth << 'x' << g_globals.m_screenHeight << LOG_FLUSH;
+        HaxSdk::Log(std::format("[D3D9] Resolution changed to {}x{}\n", static_cast<int>(g_globals.m_screenWidth), static_cast<int>(g_globals.m_screenHeight)));
         return result;
     }
 } // dx9
@@ -533,7 +533,7 @@ namespace dx10 {
         ID3D10Device* pDevice;
         HRESULT result = D3D10CreateDeviceAndSwapChain(NULL, D3D10_DRIVER_TYPE_NULL, NULL, 0, D3D10_SDK_VERSION, &swapChainDesc, &pSwapChain, &pDevice);
         if (result != S_OK) {
-            LOG_ERROR << "[D3D10] D3D10CreateDeviceAndSwapChain returned " << result << ". Hook not installed" << LOG_FLUSH;
+            HaxSdk::Log(std::format("[D3D10] D3D10CreateDeviceAndSwapChain returned {}. Hook not installed\n", result));
             return;
         }
 
@@ -541,8 +541,8 @@ namespace dx10 {
         oPresent = (present_t)pVTable[8];
         oResizeBuffers = (resizeBuffers_t)pVTable[13];
 
-        LOG_DEBUG << "[D3D10] Present address is " << oPresent << LOG_FLUSH;
-        LOG_DEBUG << "[D3D10] ResizeBuffers address is " << oResizeBuffers << LOG_FLUSH;
+        HaxSdk::Log(std::format("[D3D10] Present address is {}\n", (void*)oPresent));
+        HaxSdk::Log(std::format("[D3D10] ResizeBuffers address is {}\n", (void*)oResizeBuffers));
 
         pSwapChain->Release();
         pDevice->Release();
@@ -581,7 +581,7 @@ namespace dx10 {
         }
         g_globals.m_screenHeight = static_cast<float>(height);
         g_globals.m_screenWidth = static_cast<float>(width);
-        LOG_DEBUG << "[D3D10] Resolution changed to " << g_globals.m_screenWidth << 'x' << g_globals.m_screenHeight << LOG_FLUSH;
+        HaxSdk::Log(std::format("[D3D10] Resolution changed to {}x{}\n", static_cast<int>(g_globals.m_screenWidth), static_cast<int>(g_globals.m_screenHeight)));
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 
@@ -621,7 +621,7 @@ namespace dx11 {
         };
         HRESULT result = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_NULL, NULL, 0, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &pSwapChain, &pDevice, nullptr, &g_pDeviceContext);
         if (result != S_OK) {
-            LOG_ERROR << "[D3D11] D3D11CreateDeviceAndSwapChain returned " << result << ". Hook not installed" << LOG_FLUSH;
+            HaxSdk::Log(std::format("[D3D11] D3D11CreateDeviceAndSwapChain returned {}. Hook not installed\n", result));
             return;
         }
 
@@ -632,8 +632,8 @@ namespace dx11 {
         pSwapChain->Release();
         pDevice->Release();
 
-        LOG_DEBUG << "[D3D11] Present address is " << oPresent << LOG_FLUSH;
-        LOG_DEBUG << "[D3D11] ResizeBuffers address is " << oResizeBuffers << LOG_FLUSH;
+        HaxSdk::Log(std::format("[D3D11] Present address is {}\n", (void*)oPresent));
+        HaxSdk::Log(std::format("[D3D11] ResizeBuffers address is {}\n", (void*)oResizeBuffers));
     }
 
     static void CreateRenderTarget(IDXGISwapChain* pSwapChain) {
@@ -680,6 +680,7 @@ namespace dx11 {
         }
         g_globals.m_screenHeight = static_cast<float>(height);
         g_globals.m_screenWidth = static_cast<float>(width);
+        HaxSdk::Log(std::format("[D3D11] Resolution changed to {}x{}\n", static_cast<int>(g_globals.m_screenWidth), static_cast<int>(g_globals.m_screenHeight)));
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 
@@ -742,7 +743,7 @@ namespace dx12 {
         if (swapChain1->QueryInterface(IID_PPV_ARGS(&g_pSwapChain)) != S_OK) { return; }
         for (UINT i = 0; i < NUM_BACK_BUFFERS; ++i) {
             if (g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&g_commandAllocators[i])) != S_OK) {
-                LOG_DEBUG << "CreateCommandAllocator failed" << LOG_FLUSH;
+                HaxSdk::Log("CreateCommandAllocator failed");
                 return;
             }
         }
@@ -759,9 +760,9 @@ namespace dx12 {
         oResizeBuffers = (resizeBuffers_t)pVTable[13];
         oExecuteCommandLists = (executeCommandLists_t)pCommandQueueVTable[10];
 
-        LOG_DEBUG << "[D3D12] oPresent address is " << oPresent << LOG_FLUSH;
-        LOG_DEBUG << "[D3D12] oResizeBuffers is " << oResizeBuffers << LOG_FLUSH;
-        LOG_DEBUG << "[D3D12] oExecuteCommandLists is " << oExecuteCommandLists << LOG_FLUSH;
+        HaxSdk::Log(std::format("[D3D12] oPresent address is {}\n", (void*)oPresent));
+        HaxSdk::Log(std::format("[D3D12] oResizeBuffers is {}\n", (void*)oResizeBuffers));
+        HaxSdk::Log(std::format("[D3D12] oExecuteCommandLists is {}\n", (void*)oExecuteCommandLists));
 
         if (g_pd3dCommandQueue) {
             g_pd3dCommandQueue->Release();
@@ -906,7 +907,7 @@ namespace dx12 {
         }
         g_globals.m_screenHeight = static_cast<float>(height);
         g_globals.m_screenWidth = static_cast<float>(width);
-        LOG_DEBUG << "[D3D12] Resolution changed to " << g_globals.m_screenWidth << 'x' << g_globals.m_screenHeight << LOG_FLUSH;
+        HaxSdk::Log(std::format("[D3D12] Resolution changed to {}x{}\n", static_cast<int>(g_globals.m_screenWidth), static_cast<int>(g_globals.m_screenHeight)));
         return oResizeBuffers(pSwapChain, bufferCount, width, height, newFormat, swapChainFlags);
     }
 

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <format>
 
 #include "haxsdk.h"
 #include "third_party/imgui/imgui.h"
@@ -28,7 +29,7 @@ void HaxSdk::RenderMenu() {
 }
 
 static void Start() {
-	LOG_INIT(DEBUG, true);
+    HaxSdk::InitLogger(true);
 	HaxSdk::InitializeBackendData();
     HaxSdk::InitializeUnityData();
     HaxSdk::ImplementImGui(GraphicsApi_DirectX11);
