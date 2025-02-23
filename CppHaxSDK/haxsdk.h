@@ -1,10 +1,26 @@
 #pragma once
 
-#if !defined(HAX_MONO) && !defined(HAX_IL2CPP)
-#error Either HAX_MONO or HAX_IL2CPP must be specified
+#ifndef HAX_ASSERT
+#include <assert.h>
+#define HAX_ASSERT(_EXPR, _TEXT) if (!_EXPR) \
+                                    _wassert(_CRT_WIDE(_TEXT), _CRT_WIDE(__FILE__), (unsigned)(__LINE__))
 #endif
 
-#include "globals.h"
-#include "logger/logger.h"
-#include "haxsdk_gui.h"
-#include "unity/haxsdk_unity.h"
+enum HaxBackend {
+    HaxBackend_None = 0,
+    HaxBackend_Mono = 1 << 0,
+    HaxBackend_IL2CPP = 1 << 1
+};
+
+struct HaxGlobals {
+    HaxBackend backend;
+    void* backendHandle;
+    bool visible;
+    int hotkey = 0xC0;
+    void* cheatModule;
+};
+
+namespace HaxSdk {
+    HaxGlobals& GetGlobals();
+    void InitializeCore();
+}

@@ -159,7 +159,8 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>HAX_MONO</PreprocessorDefinitions>
+      <PreprocessorDefinitions>
+      </PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -180,14 +181,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="cheat\cheat.h" />
-    <ClInclude Include="cheat\cheat_data.h" />
-    <ClInclude Include="globals.h" />
-    <ClInclude Include="backends\haxsdk_il2cpp.h" />
-    <ClInclude Include="backends\haxsdk_mono.h" />
     <ClInclude Include="haxsdk.h" />
     <ClInclude Include="haxsdk_gui.h" />
-    <ClInclude Include="unity\haxsdk_unity.h" />
     <ClInclude Include="logger\logger.h" />
     <ClInclude Include="mono\mono.h" />
     <ClInclude Include="mono\mono_api_classes.h" />
@@ -216,16 +211,12 @@
     <ClInclude Include="third_party\imgui\imstb_rectpack.h" />
     <ClInclude Include="third_party\imgui\imstb_textedit.h" />
     <ClInclude Include="third_party\imgui\imstb_truetype.h" />
-    <ClInclude Include="unity\haxsdk_unity_data.h" />
+    <ClInclude Include="third_party\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="cheat\cheat.cpp" />
-    <ClCompile Include="globals.cpp" />
-    <ClCompile Include="backends\haxsdk_il2cpp.cpp" />
-    <ClCompile Include="backends\haxsdk_mono.cpp" />
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="haxsdk.cpp" />
     <ClCompile Include="haxsdk_gui.cpp" />
-    <ClCompile Include="unity\haxsdk_unity.cpp" />
     <ClCompile Include="logger\logger.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />

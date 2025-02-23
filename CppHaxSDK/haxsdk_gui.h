@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 typedef int GraphicsApi;
 
 enum GraphicsApi_ {
@@ -10,12 +12,20 @@ enum GraphicsApi_ {
     GraphicsApi_DirectX11 = 1 << 3,
     GraphicsApi_DirectX12 = 1 << 4,
     GraphicsApi_Vulkan    = 1 << 5,
-    GraphicsApi_All       = (1 << 6) - 1
+    GraphicsApi_Any       = (1 << 6) - 1
+};
+
+struct HaxTexture {
+    void*           m_pTexture;
+    float           m_width;
+    float           m_height;
 };
 
 namespace HaxSdk {
-    void RenderMenu();
-    void RenderBackground();
-    void ApplyStyle();
-	void ImplementImGui(GraphicsApi);
+    void            AttachMenuToUnityThread();
+    void            DoOnceBeforeRendering();
+    void            RenderMenu();
+    void            RenderBackground();
+    HaxTexture      LoadTextureFromResource(int32_t id);
+    void            ImplementImGui(GraphicsApi);
 }
