@@ -1,0 +1,4 @@
+// Файлы указаний помогают среде IDE Visual Studio интерпретировать идентификаторы Visual C++
+// (например, имена функций и макросов).
+// Дополнительные сведения: https://go.microsoft.com/fwlink/?linkid=865984
+#define BACKEND_API_DECL(_RET, _FUNC, _PARAMS) using t_##_FUNC = _RET (*)_PARAMS; static t_##_FUNC _FUNC = nullptr

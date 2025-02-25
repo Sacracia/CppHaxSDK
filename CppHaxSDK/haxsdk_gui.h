@@ -22,7 +22,6 @@ struct HaxTexture {
 };
 
 namespace HaxSdk {
-    void            AttachMenuToUnityThread();
     void            DoOnceBeforeRendering();
     void            RenderMenu();
     void            RenderBackground();

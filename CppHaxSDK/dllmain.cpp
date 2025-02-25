@@ -6,9 +6,6 @@
 #include "logger/Logger.h"
 #include "haxsdk_gui.h"
 
-void            HaxSdk::AttachMenuToUnityThread() {
-
-}
 void            HaxSdk::DoOnceBeforeRendering() {
 
 }
@@ -22,7 +19,7 @@ void            HaxSdk::RenderBackground() {
 static void Start() {
 	HaxSdk::InitLogger(true);
 	HaxSdk::InitializeCore();
-	std::cout << std::hex << HaxSdk::GetGlobals().backendHandle << '\n' << HaxSdk::GetGlobals().cheatModule;
+    std::cout << std::hex << Class::Find("Assembly-CSharp", "", "GearItem")->FindField("DEFAULT_DECAY_SCALE");
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {

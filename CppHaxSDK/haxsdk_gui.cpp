@@ -103,48 +103,48 @@ namespace dx12 {
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 struct ImGuiContextParams {
-    GraphicsApi         graphicsApi;
-    LPDIRECT3DDEVICE9   pDevice9;
-    HDC                 hdc;
-    IDXGISwapChain*     pSwapChain;
+    GraphicsApi                         graphicsApi;
+    LPDIRECT3DDEVICE9                   pDevice9;
+    HDC                                 hdc;
+    IDXGISwapChain*                     pSwapChain;
 };
 
-static LRESULT WINAPI       HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags);
-static LRESULT WINAPI       HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-static BOOL WINAPI          HookedSetCursorPos(int X, int Y);
-static BOOL WINAPI          HookedClipCursor(const RECT* lpRect);
-static void                 InitImGuiContext(const ImGuiContextParams& params);
+static LRESULT WINAPI                   HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags);
+static LRESULT WINAPI                   HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+static BOOL WINAPI                      HookedSetCursorPos(int X, int Y);
+static BOOL WINAPI                      HookedClipCursor(const RECT* lpRect);
+static void                             InitImGuiContext(const ImGuiContextParams& params);
 
 namespace opengl {
-    static void             Hook();
-    static bool WINAPI      HookedSwapBuffers(HDC hdc);
-    static HaxTexture    LoadTextureFromResource(int32_t id);
+    static void                         Hook();
+    static bool WINAPI                  HookedSwapBuffers(HDC hdc);
+    static HaxTexture                   LoadTextureFromResource(int32_t id);
 }
 namespace dx9 {
-    static void             Hook();
-    static HRESULT WINAPI   HookedReset(LPDIRECT3DDEVICE9 pDevice, D3DPRESENT_PARAMETERS* pPresentationParameters);
-    static HRESULT WINAPI   HookedEndScene(LPDIRECT3DDEVICE9 pDevice);
+    static void                         Hook();
+    static HRESULT WINAPI               HookedReset(LPDIRECT3DDEVICE9 pDevice, D3DPRESENT_PARAMETERS* pPresentationParameters);
+    static HRESULT WINAPI               HookedEndScene(LPDIRECT3DDEVICE9 pDevice);
 }
 namespace dx10 {
-    static void             Setup();
-    static void             Render(IDXGISwapChain* pSwapChain);
-    static void             CreateRenderTarget(IDXGISwapChain* pSwapChain);
-    static HRESULT WINAPI   HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
+    static void                         Setup();
+    static void                         Render(IDXGISwapChain* pSwapChain);
+    static void                         CreateRenderTarget(IDXGISwapChain* pSwapChain);
+    static HRESULT WINAPI               HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
 }
 namespace dx11 {
-    static void             Setup();
-    static void             Render(IDXGISwapChain* pSwapChain);
-    static void             CreateRenderTarget(IDXGISwapChain* pSwapChain);
-    static HRESULT WINAPI   HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
-    static HaxTexture    LoadTextureFromResource(int32_t id);
+    static void                         Setup();
+    static void                         Render(IDXGISwapChain* pSwapChain);
+    static void                         CreateRenderTarget(IDXGISwapChain* pSwapChain);
+    static HRESULT WINAPI               HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width, UINT height, DXGI_FORMAT newFormat, UINT swapChainFlags);
+    static HaxTexture                   LoadTextureFromResource(int32_t id);
 }
 namespace dx12 {
-    static void             Setup();
-    static void             Render(IDXGISwapChain3* pSwapChain);
-    static void             CreateRenderTarget(IDXGISwapChain* pSwapChain);
-    static HRESULT WINAPI   HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT BufferCount, UINT Width, 
-                                                UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
-    static void WINAPI      HookedExecuteCommandLists(ID3D12CommandQueue* pCommandQueue, UINT NumCommandLists, ID3D12CommandList* ppCommandLists);
+    static void                         Setup();
+    static void                         Render(IDXGISwapChain3* pSwapChain);
+    static void                         CreateRenderTarget(IDXGISwapChain* pSwapChain);
+    static HRESULT WINAPI               HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT BufferCount, UINT Width, 
+                                                            UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
+    static void WINAPI                  HookedExecuteCommandLists(ID3D12CommandQueue* pCommandQueue, UINT NumCommandLists, ID3D12CommandList* ppCommandLists);
 }
 
 void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
@@ -263,7 +263,7 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
 }
 
 static void InitImGuiContext(const ImGuiContextParams& params) {
-    HaxSdk::AttachMenuToUnityThread();
+    HaxSdk::UnityAttachThread();
 
     HWND hwnd = 0;
     if (params.graphicsApi & GraphicsApi_OpenGL) {

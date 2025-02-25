@@ -166,5 +166,6 @@
   <ItemGroup>
     <None Include="third_party\detours\x86\detours.pdb" />
     <None Include="third_party\detours\x64\detours.pdb" />
+    <None Include="cpp.hint" />
   </ItemGroup>
 </Project>

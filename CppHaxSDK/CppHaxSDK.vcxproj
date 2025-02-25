@@ -236,6 +236,7 @@
     <Library Include="third_party\detours\x86\detours.lib" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="cpp.hint" />
     <None Include="third_party\detours\x64\detours.pdb" />
     <None Include="third_party\detours\x86\detours.pdb" />
   </ItemGroup>
