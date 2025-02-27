@@ -370,13 +370,17 @@ Method* Class::FindMethod(const char* name, const char* signature) {
     while (Method* pMethod = isMono ? mono_class_get_methods(this, &iter) : il2cpp_class_get_methods(this, &iter)) {
         const char* methodName = isMono ? mono_method_get_name(pMethod) : il2cpp_method_get_name(pMethod);
         if (strcmp(methodName, name) == 0) {
-            if (!signature || signature[0] == '\0')
+            if (!signature || signature[0] == '\0') {
+                std::cout << name << ' ' << std::hex << pMethod->GetAddress() << '\n';
                 return pMethod;
+            }
 
             char buff[256] = {0};
             isMono ? GetSignature((MonoMethod*)pMethod, buff) : GetSignature((Il2CppMethod*)pMethod, buff);
-            if (strcmp(signature, buff) == 0)
+            if (strcmp(signature, buff) == 0) {
+                std::cout << name << signature << ' ' << std::hex << pMethod->GetAddress() << '\n';
                 return pMethod;
+            }
         }
     }
 
@@ -448,10 +452,7 @@ const char* Class::GetName() {
 }
 
 System::Type* Class::GetSystemType() {
-    if (g_globals.backend & HaxBackend_Mono)
-        return mono_class_get_type(this)->GetSystemType(); 
-
-    return il2cpp_class_get_type(this)->GetSystemType();
+    return g_globals.backend & HaxBackend_Mono ? mono_class_get_type(this)->GetSystemType() : il2cpp_class_get_type(this)->GetSystemType();
 }
 
 Domain* Domain::Main() {
@@ -496,12 +497,15 @@ struct Il2CppMethod {
 };
 
 System::Object* Method::Invoke(void* __this, void** ppArgs) {
-    return g_globals.backend & HaxBackend_Mono ? mono_runtime_invoke(this, __this, ppArgs, nullptr) 
-        : il2cpp_runtime_invoke(this, __this, ppArgs, nullptr);
+    return g_globals.backend & HaxBackend_Mono ? mono_runtime_invoke(this, __this, ppArgs, nullptr) : il2cpp_runtime_invoke(this, __this, ppArgs, nullptr);
 }
 
 void* Method::GetAddress() {
     return g_globals.backend & HaxBackend_Mono ? mono_compile_method(this) : ((Il2CppMethod*)this)->ptr;
+}
+
+System::String* System::String::New(const char* data) {
+    return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? mono_string_new(Domain::Main(), data) : il2cpp_string_new(data);
 }
 
 void GetSignature(MonoMethod* pMethod, char* buff) {

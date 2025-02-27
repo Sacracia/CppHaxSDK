@@ -197,7 +197,7 @@ template <class T>
 struct System::Array : System::Object {
     void* pBounds;
     size_t length;
-    T vector[0]; // We dont care about instantiating Array, so 0-length is ok.
+    T vector[1]; // We dont care about instantiating Array, so 0-length is ok.
 };
 
 // Represents .NET Framework System.Collections.Generic.Dictionary
@@ -220,10 +220,10 @@ struct System::Array : System::Object {
 //};
 
 // Represents .NET Framework System.Enum
-//struct System::Enum : System::Object {
-//    static Array<String*>* GetNames(System::Type* pType);
-//    static Array<int32_t>* GetValues(System::Type* pType);
-//};
+struct System::Enum : System::Object {
+    static Array<String*>* GetNames(System::Type* pType);
+    static Array<int32_t>* GetValues(System::Type* pType);
+};
 
 template <class T> 
 struct System::List : System::Object {
@@ -234,7 +234,8 @@ struct System::List : System::Object {
 };
 
 struct System::String : System::Object {
-    static System::String* New(const char* data);
+    static System::String* New(const char* data); // l
+public:
     Int32 length;
     Char chars[1];
 };
