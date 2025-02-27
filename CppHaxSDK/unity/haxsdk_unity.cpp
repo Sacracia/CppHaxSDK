@@ -84,6 +84,72 @@ namespace Unity {
         return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? *(Vector3*)method.Invoke(this, nullptr)->Unbox() : method.ptr(this);
     }
 
+    /*struct Camera {
+        Camera() = delete;
+        Camera(const Camera&) = delete;
+    public:
+        static ::Class* GetClass();
+    public:
+        static Camera* GetMain();
+        Vector3 WorldToScreenPoint(Vector3 position);
+        Vector3 WorldToScreenPoint_Injected(Vector3 position);
+    };*/
+
+    Class* Camera::GetClass() {
+        static Class* pClass = Class::Find(module, nameSpace, "Camera");
+        return pClass;
+    }
+
+    Camera* Camera::GetMain() {
+        static HaxMethod<Camera*(*)()> method(Camera::GetClass()->FindMethod("get_main"));
+        return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? (Camera*)method.Invoke(nullptr, nullptr) : method.ptr();
+    }
+
+    Vector3 Camera::WorldToScreenPoint(Vector3 position) {
+        static HaxMethod<Vector3(__fastcall*)(Camera*,Vector3)> method(Camera::GetClass()->FindMethod("WorldToScreenPoint", "UnityEngine.Vector3(UnityEngine.Vector3)"));
+        if (HaxSdk::GetGlobals().backend & HaxBackend_Mono) {
+            void* args[] = { &position };
+            return *(Vector3*)method.Invoke(this, args)->Unbox();
+        }
+
+        return method.ptr(this, position);
+    }
+
+    Vector3 Camera::WorldToScreenPoint_Injected(Vector3 position, Camera::MonoOrStereoscopicEye eye) {
+        static HaxMethod<void(__fastcall*)(Vector3*,Int32,Vector3*)> method(Camera::GetClass()->FindMethod("WorldToScreenPoint_Injected"));
+        Vector3 res;
+        method.ptr(&position, eye, &res);
+        return res;
+    }
+
+    Vector3 Camera::INTERNAL_CALL_WorldToScreenPoint(Vector3 position) {
+        static HaxMethod<void(__fastcall*)(Camera*,Vector3*,Vector3*)> method(Camera::GetClass()->FindMethod("INTERNAL_CALL_WorldToScreenPoint"));
+        Vector3 res;
+        method.ptr(this, &position, &res);
+        return res;
+    }
+
+    Class* Collider::GetClass() {
+        static Class* pClass = Class::Find(module, nameSpace, "Collider");
+        return pClass;
+    }
+
+    bool Collider::GetEnabled() {
+        static HaxMethod<bool(__fastcall*)(Collider*)> method(Collider::GetClass()->FindMethod("get_enabled"));
+        return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? *(bool*)method.Invoke(this, nullptr)->Unbox() : method.ptr(this);
+    }
+
+    void Collider::SetEnabled(bool value) {
+        static HaxMethod<void(__fastcall*)(Collider*,bool)> method(Collider::GetClass()->FindMethod("set_enabled"));
+        if (HaxSdk::GetGlobals().backend & HaxBackend_Mono) {
+            void* args[] = { &value };
+            method.Invoke(this, args);
+            return;
+        }
+
+        method.ptr(this, value);
+    }
+
     Class* Object::GetClass() {
         static Class* pClass = Class::Find(module, nameSpace, "Object");
         return pClass;
@@ -224,6 +290,11 @@ namespace Unity {
     GameObject* Component::GetGameObject() {
         static HaxMethod<GameObject*(*)(Component*)> method(Component::GetClass()->FindMethod("get_gameObject"));
         return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? (GameObject*)method.Invoke(this, nullptr) : method.ptr(this);
+    }
+
+    System::Type* KeyCode::GetSystemType() {
+        static System::Type* pType = Class::Find(module, nameSpace, "KeyCode")->GetSystemType();
+        return pType;
     }
 
     Class* Transform::GetClass() {
