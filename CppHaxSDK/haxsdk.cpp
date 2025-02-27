@@ -60,16 +60,8 @@ HaxGlobals& HaxSdk::GetGlobals() {
     return g_globals;
 }
 
-struct MonoMethod {
-    uint16_t            flags;
-    uint16_t            iflags;
-    uint32_t            token;
-    Class*              pClass;
-};
-
-struct Il2CppMethod {
-    void* ptr;
-};
+struct Il2CppMethod;
+struct MonoMethod;
 
 using MethodSignature = void;
 using t_mono_get_root_domain                = Domain* (*)();
@@ -105,6 +97,8 @@ using t_mono_signature_get_param_count      = uint32_t (*)(MethodSignature*);
 using t_mono_signature_get_params           = Type* (*)(MethodSignature*, void**);
 using t_mono_method_get_unmanaged_thunk     = void* (*)(void*);
 using t_mono_string_to_utf8                 = char* (*)(System::String*);
+using t_mono_field_static_get_value         = void (*)(void* pVtable, Field* pField, void* pValue);
+using t_mono_field_static_set_value         = void (*)(void* pVtable, Field* pField, void* pValue);
 
 static t_mono_get_root_domain               mono_get_root_domain;
 static t_mono_domain_assembly_open          mono_domain_assembly_open;
@@ -137,6 +131,8 @@ static t_mono_signature_get_param_count     mono_signature_get_param_count;
 static t_mono_signature_get_params          mono_signature_get_params;
 static t_mono_method_get_unmanaged_thunk    mono_method_get_unmanaged_thunk;
 static t_mono_string_to_utf8                mono_string_to_utf8;
+static t_mono_field_static_get_value        mono_field_static_get_value;
+static t_mono_field_static_set_value        mono_field_static_set_value;
 
 using t_il2cpp_object_new                   = System::Object* (*)(Class* pClass);
 using t_il2cpp_object_unbox                 = void* (*)(System::Object* obj);
@@ -158,6 +154,9 @@ using t_il2cpp_method_get_class             = Class * (*)(Method* pMethod);
 using t_il2cpp_method_get_name              = const char* (*)(Method* pMethod);
 using t_il2cpp_method_get_return_type       = Type * (*)(Method* pMethod);
 using t_il2cpp_string_new                   = System::String* (*)(const char* str);
+using t_il2cpp_class_get_static_field_data  = void* (*)(Class*);
+using t_il2cpp_field_static_get_value       = void (*)(Field* pField, void* pValue);
+using t_il2cpp_field_static_set_value       = void (*)(Field* pField, void* pValue);
 
 static t_il2cpp_object_new                  il2cpp_object_new;
 static t_il2cpp_object_unbox                il2cpp_object_unbox;
@@ -179,6 +178,9 @@ static t_il2cpp_method_get_class            il2cpp_method_get_class;
 static t_il2cpp_method_get_name             il2cpp_method_get_name;
 static t_il2cpp_method_get_return_type      il2cpp_method_get_return_type;
 static t_il2cpp_string_new                  il2cpp_string_new;
+static t_il2cpp_class_get_static_field_data il2cpp_class_get_static_field_data;
+static t_il2cpp_field_static_get_value      il2cpp_field_static_get_value;
+static t_il2cpp_field_static_set_value      il2cpp_field_static_set_value;
 
 static void DetermineBackend();
 static void DefineBackendApi();
@@ -243,6 +245,9 @@ static void DefineBackendApi() {
         BACKEND_API_DEF(il2cpp_method_get_name, hModule);
         BACKEND_API_DEF(il2cpp_method_get_return_type, hModule);
         BACKEND_API_DEF(il2cpp_string_new, hModule);
+        BACKEND_API_DEF(il2cpp_field_static_get_value, hModule);
+        BACKEND_API_DEF(il2cpp_field_static_set_value, hModule);
+        BACKEND_API_DEF_OPT(il2cpp_class_get_static_field_data, hModule);
     }
     else {
         BACKEND_API_DEF(mono_get_root_domain, hModule);
@@ -275,8 +280,21 @@ static void DefineBackendApi() {
         BACKEND_API_DEF(mono_signature_get_param_count, hModule);
         BACKEND_API_DEF(mono_signature_get_params, hModule);
         BACKEND_API_DEF(mono_string_to_utf8, hModule);
+        BACKEND_API_DEF(mono_field_static_get_value, hModule);
+        BACKEND_API_DEF(mono_field_static_set_value, hModule);
     }
 }
+
+struct Il2CppAssembly {
+    Image*      pImage;
+    uint32_t    token;
+    int32_t     referencedAssemblyStart;
+    int32_t     referencedAssemblyCount;
+    const char* name;
+};
+
+struct MonoAssembly {
+};
 
 Assembly* Assembly::Find(const char* name) {
     Assembly* pAssembly;
@@ -299,7 +317,7 @@ bool Assembly::Exists(const char* name, OUT Assembly*& pRes) {
     size_t nDomains = 0;
     Assembly** ppAssembly = il2cpp_domain_get_assemblies(pDomain, &nDomains);
     for (size_t i = 0; i < nDomains; ++i) {
-        if (strcmp(ppAssembly[i]->il2cpp.name, name) == 0) {
+        if (strcmp(((Il2CppAssembly*)ppAssembly[i])->name, name) == 0) {
             pRes = ppAssembly[i];
             return true;
         }
@@ -309,8 +327,19 @@ bool Assembly::Exists(const char* name, OUT Assembly*& pRes) {
 }
 
 Image* Assembly::GetImage() {
-    return g_globals.backend & HaxBackend_IL2CPP ? this->il2cpp.pImage : mono_assembly_get_image(this);
+    return g_globals.backend & HaxBackend_IL2CPP ? ((Il2CppAssembly*)this)->pImage : mono_assembly_get_image(this);
 }
+
+struct Il2CppClass {
+    Image*                  image;
+    void*                   gcDesc;
+    const char*             name;
+    const char*             nameSpace;
+    Type                    byvalArg;
+    Type                    thisArg;
+    void*                   __space[15];
+    void*                   staticFields;
+};
 
 bool Class::Exists(const char* assembly, const char* nameSpace, const char* name, OUT Class*& pClass) {
     Assembly* pAssembly;
@@ -356,6 +385,21 @@ Method* Class::FindMethod(const char* name, const char* signature) {
     return nullptr;
 }
 
+struct Il2CppField {
+    const char* name;
+    Type*       type;
+    Class*      parent;
+    int32_t     offset;
+    uint32_t    token;
+};
+
+struct MonoField {
+    Type*       type;
+    const char* name;
+    Class*      parent;
+    int32_t     offset;
+};
+
 Field* Class::FindField(const char* name) {
     Field* pField = g_globals.backend & HaxBackend_Mono ? mono_class_get_field_from_name(this, name)
         : il2cpp_class_get_field_from_name(this, name);
@@ -368,14 +412,39 @@ Field* Class::FindField(const char* name) {
 
 void* Class::FindStaticField(const char* name) {
     int32_t offset = FindField(name)->Offset();
-    void* pStaticFields = g_globals.backend & HaxBackend_IL2CPP ? this->il2cpp.staticFields 
-        : mono_vtable_get_static_field_data(mono_class_vtable(Domain::Main(), this));
-    std::cout << std::hex << pStaticFields << '\n';
-    return (void*)((char*)pStaticFields + offset);
+    return (void*)((char*)GetStaticFieldsData() + offset);
+}
+
+void* Class::GetStaticFieldsData() {
+    if (g_globals.backend & HaxBackend_IL2CPP)
+        return il2cpp_class_get_static_field_data ? il2cpp_class_get_static_field_data(this) : ((Il2CppClass*)this)->staticFields;
+    return mono_vtable_get_static_field_data(mono_class_vtable(Domain::Main(), this));
+}
+
+int32_t Field::Offset() {
+    return g_globals.backend & HaxBackend_IL2CPP ? ((Il2CppField*)this)->offset : ((MonoField*)this)->offset;
+}
+
+void Field::GetStaticValue(void* pValue) {
+    if (g_globals.backend & HaxBackend_Mono) {
+        void* pVtable = mono_class_vtable(Domain::Main(), ((MonoField*)this)->parent);
+        mono_field_static_get_value(pVtable, this, pValue);
+        return;
+    }
+    il2cpp_field_static_get_value(this, pValue);
+}
+
+void Field::SetStaticValue(void* pValue) {
+    if (g_globals.backend & HaxBackend_Mono) {
+        void* pVtable = mono_class_vtable(Domain::Main(), ((MonoField*)this)->parent);
+        mono_field_static_set_value(pVtable, this, pValue);
+        return;
+    }
+    il2cpp_field_static_set_value(this, pValue);
 }
 
 const char* Class::GetName() {
-    return g_globals.backend & HaxBackend_Mono ? mono_class_get_name(this) : this->il2cpp.name;
+    return g_globals.backend & HaxBackend_Mono ? mono_class_get_name(this) : ((Il2CppClass*)this)->name;
 }
 
 System::Type* Class::GetSystemType() {
@@ -394,6 +463,16 @@ void Domain::AttachThread() {
     g_globals.backend & HaxBackend_Mono ? mono_thread_attach(pDomain) : il2cpp_thread_attach(pDomain);
 }
 
+struct Il2CppType {
+    void* m_data;
+    unsigned int            m_attrs : 16;
+    int                     m_type : 8;
+    unsigned int            m_num_mods : 5;
+    unsigned int            m_byref : 1;
+    unsigned int            m_pinned : 1;
+    unsigned int            m_valuetype : 1;
+};
+
 System::Type* Type::GetSystemType() {
     return g_globals.backend & HaxBackend_Mono ? mono_type_get_object(Domain::Main(), this) : il2cpp_type_get_object(this);
 }
@@ -410,6 +489,11 @@ System::Object* System::Object::Ctor() {
 void* System::Object::Unbox() {
     return g_globals.backend & HaxBackend_Mono ? mono_object_unbox(this) : il2cpp_object_unbox(this);
 }
+
+struct Il2CppMethod {
+    void* ptr;
+    // <...>
+};
 
 System::Object* Method::Invoke(void* __this, void** ppArgs) {
     return g_globals.backend & HaxBackend_Mono ? mono_runtime_invoke(this, __this, ppArgs, nullptr) 

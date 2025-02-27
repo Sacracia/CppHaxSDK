@@ -87,21 +87,6 @@ struct Assembly {
     static bool Exists(const char* name, OUT Assembly*& pRes);
 public:
     Image* GetImage();
-private:
-    struct Il2CppAssembly {
-        Image*      pImage;
-        uint32_t    token;
-        int32_t     referencedAssemblyStart;
-        int32_t     referencedAssemblyCount;
-        const char* name;
-    };
-    struct MonoAssembly {
-    };
-private:
-    union {
-        Il2CppAssembly il2cpp;
-        MonoAssembly mono;
-    };
 };
 
 //-----------------------------------------------------------------------------
@@ -116,13 +101,13 @@ struct Type {
     System::Type* GetSystemType();
 private:
     struct Il2CppType {
-        void*                   m_data;
-        unsigned int            m_attrs : 16;
-        int                     m_type : 8;
-        unsigned int            m_num_mods : 5;
-        unsigned int            m_byref : 1;
-        unsigned int            m_pinned : 1;
-        unsigned int            m_valuetype : 1;
+        void*                   data;
+        unsigned int            attrs : 16;
+        int                     type : 8;
+        unsigned int            num_mods : 5;
+        unsigned int            byref : 1;
+        unsigned int            pinned : 1;
+        unsigned int            valuetype : 1;
     };
     struct MonoType {
     };
@@ -140,26 +125,9 @@ public:
     Method* FindMethod(const char* name, const char* signature = nullptr);
     Field* FindField(const char* name);
     void* FindStaticField(const char* name);
+    void* GetStaticFieldsData();
     const char* GetName();
     System::Type* GetSystemType();
-private:
-    struct Il2CppClass {
-        Image*                  image;
-        void*                   gcDesc;
-        const char*             name;
-        const char*             nameSpace;
-        Type                    byvalArg;
-        Type                    thisArg;
-        void*                   __space[15];
-        void*                   staticFields;
-    };
-    struct MonoClass {
-    };
-private:
-    union {
-        Il2CppClass il2cpp;
-        MonoClass mono;
-    };
 };
 
 struct Domain {
@@ -169,42 +137,25 @@ public:
 };
 
 struct Field {
-    friend struct Class;
-    inline int32_t Offset() { return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? mono.offset : il2cpp.offset; }
-private:
-    struct Il2CppField {
-        const char* name;
-        Type*       type;
-        Class*      parent;
-        int32_t     offset;
-        uint32_t    token;
-    };
-    struct MonoField {
-        Type*       type;
-        const char* name;
-        Class*      parent;
-        int32_t     offset;
-    };
-private:
-    union {
-        Il2CppField il2cpp;
-        MonoField mono;
-    };
+    int32_t Offset();
+    void GetStaticValue(void* pValue);
+    void SetStaticValue(void* pValue);
 };
 
 struct Method {
-    friend struct Class;
     System::Object* Invoke(void* __this, void** ppArgs);
     void* GetAddress();
 };
 
 template <typename T>
-struct MethodWrapper {
-    MethodWrapper(Method* pMethod) { ptr = orig = (T)pMethod->GetAddress(); pBase = pMethod; }
+struct HaxMethod {
+    HaxMethod(Method* pMethod) { ptr = orig = (T)pMethod->GetAddress(); pBase = pMethod; }
 public:
+    inline System::Object* Invoke(void* __this, void** args) { return pBase->Invoke(__this, args); }
+public:
+    Method* pBase;
     T ptr;
     T orig;
-    Method* pBase;
 };
 
 struct Thread {
@@ -213,7 +164,6 @@ struct Thread {
 struct System::Object {
     static Object* New(Class* pClass);
 public:
-    inline Class* GetClass() { return *ppClass; }
     System::Object* Ctor();
     void* Unbox();
 public:
@@ -243,12 +193,12 @@ public:
 
 // Represents .NET Framework System.Array
 // May be unsafe when T is not a pointer, but generally it is.
-//template <class T> 
-//struct System::Array : System::Object {
-//    void* pBounds;
-//    size_t length;
-//    T vector[0]; // We dont care about instantiating Array, so 0-length is ok.
-//};
+template <class T> 
+struct System::Array : System::Object {
+    void* pBounds;
+    size_t length;
+    T vector[0]; // We dont care about instantiating Array, so 0-length is ok.
+};
 
 // Represents .NET Framework System.Collections.Generic.Dictionary
 // Works only for .NET Framework 4
@@ -275,19 +225,20 @@ public:
 //    static Array<int32_t>* GetValues(System::Type* pType);
 //};
 
-//template <class T> 
-//struct System::List : System::Object {
-//    Array<T>* pItems;
-//    Int32 length;
-//    Int32 version;
-//    void* pSyncRoot;
-//};
-//
-//struct System::String : System::Object {
-//    Int32 length;
-//    Char chars[1];
-//};
-//
-//struct System::Type : System::Object {
-//    ::Type* pType;
-//};
+template <class T> 
+struct System::List : System::Object {
+    Array<T>* pItems;
+    Int32 length;
+    Int32 version;
+    void* pSyncRoot;
+};
+
+struct System::String : System::Object {
+    static System::String* New(const char* data);
+    Int32 length;
+    Char chars[1];
+};
+
+struct System::Type : System::Object {
+    ::Type* pType;
+};

@@ -212,6 +212,7 @@
     <ClInclude Include="third_party\imgui\imstb_textedit.h" />
     <ClInclude Include="third_party\imgui\imstb_truetype.h" />
     <ClInclude Include="third_party\stb_image.h" />
+    <ClInclude Include="unity\haxsdk_unity.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
@@ -230,6 +231,7 @@
     <ClCompile Include="third_party\imgui\imgui_draw.cpp" />
     <ClCompile Include="third_party\imgui\imgui_tables.cpp" />
     <ClCompile Include="third_party\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="unity\haxsdk_unity.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="third_party\detours\x64\detours.lib" />
