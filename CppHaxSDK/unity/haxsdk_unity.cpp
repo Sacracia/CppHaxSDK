@@ -1,11 +1,11 @@
 #include "haxsdk_unity.h"
 
-static const char* module = "UnityEngine.CoreModule";
-static const char* nameSpace = "UnityEngine";
-
 namespace Unity {
+    static const char* MODULE = "UnityEngine";
+    static const char* NAMESPACE = "UnityEngine";
+
     Class* AsyncOperation::GetClass() {
-        static Class* pClass = Class::Find(module, nameSpace, "AsyncOperation");
+        static Class* pClass = Class::Find(MODULE, NAMESPACE, "AsyncOperation");
         return pClass;
     }
 
@@ -20,7 +20,7 @@ namespace Unity {
     }
 
     Class* Behaviour::GetClass() {
-        static Class* pClass = Class::Find(module, nameSpace, "Behaviour");
+        static Class* pClass = Class::Find(MODULE, NAMESPACE, "Behaviour");
         return pClass;
     }
 
@@ -46,7 +46,7 @@ namespace Unity {
     }
 
     Class* BoxCollider::GetClass() {
-        static Class* pClass = Class::Find(module, nameSpace, "BoxCollider");
+        static Class* pClass = Class::Find(MODULE, NAMESPACE, "BoxCollider");
         return pClass;
     }
 
@@ -84,19 +84,8 @@ namespace Unity {
         return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? *(Vector3*)method.Invoke(this, nullptr)->Unbox() : method.ptr(this);
     }
 
-    /*struct Camera {
-        Camera() = delete;
-        Camera(const Camera&) = delete;
-    public:
-        static ::Class* GetClass();
-    public:
-        static Camera* GetMain();
-        Vector3 WorldToScreenPoint(Vector3 position);
-        Vector3 WorldToScreenPoint_Injected(Vector3 position);
-    };*/
-
     Class* Camera::GetClass() {
-        static Class* pClass = Class::Find(module, nameSpace, "Camera");
+        static Class* pClass = Class::Find(MODULE, NAMESPACE, "Camera");
         return pClass;
     }
 
@@ -130,7 +119,7 @@ namespace Unity {
     }
 
     Class* Collider::GetClass() {
-        static Class* pClass = Class::Find(module, nameSpace, "Collider");
+        static Class* pClass = Class::Find(MODULE, NAMESPACE, "Collider");
         return pClass;
     }
 
@@ -151,7 +140,7 @@ namespace Unity {
     }
 
     Class* Object::GetClass() {
-        static Class* pClass = Class::Find(module, nameSpace, "Object");
+        static Class* pClass = Class::Find(MODULE, NAMESPACE, "Object");
         return pClass;
     }
 
@@ -191,7 +180,7 @@ namespace Unity {
     }
 
     Class* GameObject::GetClass() {
-        static Class* pClass = Class::Find(module, nameSpace, "GameObject");
+        static Class* pClass = Class::Find(MODULE, NAMESPACE, "GameObject");
         return pClass;
     }
 
@@ -283,7 +272,7 @@ namespace Unity {
     }
 
     Class* Component::GetClass() {
-        static Class* pClass = Class::Find(module, nameSpace, "Component");
+        static Class* pClass = Class::Find(MODULE, NAMESPACE, "Component");
         return pClass;
     }
 
@@ -293,12 +282,12 @@ namespace Unity {
     }
 
     System::Type* KeyCode::GetSystemType() {
-        static System::Type* pType = Class::Find(module, nameSpace, "KeyCode")->GetSystemType();
+        static System::Type* pType = Class::Find(MODULE, NAMESPACE, "KeyCode")->GetSystemType();
         return pType;
     }
 
     Class* Transform::GetClass() {
-        static Class* pClass = Class::Find(module, nameSpace, "Transform");
+        static Class* pClass = Class::Find(MODULE, NAMESPACE, "Transform");
         return pClass;
     }
 
@@ -340,7 +329,7 @@ namespace Unity {
     }
 
     Class* Light::GetClass() {
-        static Class* pClass = Class::Find(module, nameSpace, "Light");
+        static Class* pClass = Class::Find(MODULE, NAMESPACE, "Light");
         return pClass;
     }
 

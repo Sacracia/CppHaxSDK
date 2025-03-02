@@ -183,7 +183,6 @@
   <ItemGroup>
     <ClInclude Include="haxsdk.h" />
     <ClInclude Include="haxsdk_gui.h" />
-    <ClInclude Include="logger\logger.h" />
     <ClInclude Include="mono\mono.h" />
     <ClInclude Include="mono\mono_api_classes.h" />
     <ClInclude Include="mono\mono_api_functions.h" />
@@ -218,7 +217,6 @@
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="haxsdk.cpp" />
     <ClCompile Include="haxsdk_gui.cpp" />
-    <ClCompile Include="logger\logger.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp" />

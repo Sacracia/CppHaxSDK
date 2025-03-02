@@ -5,6 +5,7 @@
 // [SECTION] Dear ImGui end-user API functions
 
 #include <cstdint>
+#include <string_view>
 
 #ifndef HAX_ASSERT
 #include <assert.h>
@@ -36,6 +37,7 @@ typedef char16_t Char;
 // HaxSdk custom classes and enums
 enum HaxBackend;
 struct HaxGlobals;
+struct HaxLogger;
 
 // Mono / IL2CPP basic classes
 struct Assembly;
@@ -71,21 +73,26 @@ enum HaxBackend {
 struct HaxGlobals {
     HaxBackend backend;
     void* backendHandle;
-    bool visible;
+    bool visible = true;
     int hotkey = 0xC0;
     void* cheatModule;
 };
 
 namespace HaxSdk {
     HaxGlobals& GetGlobals();
+    void InitLogger(bool useConsole);
+    void Log(std::string_view text);
     void InitializeCore();
     void UnityAttachThread();
 }
 
 struct Assembly {
+    Assembly() = delete;
+    Assembly(const Assembly&) = delete;
+
     static Assembly* Find(const char* name);
     static bool Exists(const char* name, OUT Assembly*& pRes);
-public:
+
     Image* GetImage();
 };
 
@@ -98,10 +105,8 @@ public:
 // Represents internal mono type. See backend definitions from above.
 // The content of the class differs from backend to backend, but for us it is useless as we use Type only for getting System.Type
 struct Type {
-    System::Type* GetSystemType();
-private:
     struct Il2CppType {
-        void*                   data;
+        void* data;
         unsigned int            attrs : 16;
         int                     type : 8;
         unsigned int            num_mods : 5;
@@ -109,8 +114,14 @@ private:
         unsigned int            pinned : 1;
         unsigned int            valuetype : 1;
     };
+
     struct MonoType {
     };
+
+    Type() = delete;
+    Type(const Type&) = delete;
+
+    System::Type* GetSystemType();
 private:
     union {
         Il2CppType il2cpp;
@@ -119,9 +130,12 @@ private:
 };
 
 struct Class {
+    Class() = delete;
+    Class(const Class&) = delete;
+
     static bool Exists(const char* assembly, const char* nameSpace, const char* name, OUT Class*& pClass);
     static Class* Find(const char* assembly, const char* nameSpace, const char* name);
-public:
+
     Method* FindMethod(const char* name, const char* signature = nullptr);
     Field* FindField(const char* name);
     void* FindStaticField(const char* name);
@@ -131,18 +145,27 @@ public:
 };
 
 struct Domain {
+    Domain() = delete;
+    Domain(const Domain&) = delete;
+
     static Domain* Main();
-public:
+
     void AttachThread();
 };
 
 struct Field {
+    Field() = delete;
+    Field(const Field&) = delete;
+
     int32_t Offset();
     void GetStaticValue(void* pValue);
     void SetStaticValue(void* pValue);
 };
 
 struct Method {
+    Method() = delete;
+    Method(const Method&) = delete;
+
     System::Object* Invoke(void* __this, void** ppArgs);
     void* GetAddress();
 };
@@ -150,83 +173,76 @@ struct Method {
 template <typename T>
 struct HaxMethod {
     HaxMethod(Method* pMethod) { ptr = orig = (T)pMethod->GetAddress(); pBase = pMethod; }
-public:
+
     inline System::Object* Invoke(void* __this, void** args) { return pBase->Invoke(__this, args); }
-public:
+
     Method* pBase;
     T ptr;
     T orig;
 };
 
 struct Thread {
+    Thread() = delete;
+    Thread(const Thread&) = delete;
 };
 
 struct System::Object {
+    System::Object() = delete;
+    System::Object(const System::Object&) = delete;
+
     static Object* New(Class* pClass);
-public:
+
     System::Object* Ctor();
     void* Unbox();
-public:
+
     Class** ppClass;
     void* monitor;
 };
-
-//-----------------------------------------------------------------------------
-// [CLASS] System.Array
-// [MONO ] https://github.com/mono/mono/blob/0f53e9e151d92944cacab3e24ac359410c606df6/mono/metadata/object-internals.h#L169 
-// struct _MonoArray {
-//     MonoObject obj;
-//     MonoArrayBounds* bounds;
-//     mono_array_size_t max_length;
-//     mono_64bitaligned_t vector[MONO_ZERO_LEN_ARRAY];
-// };
-// 
-// [IL2CPP] https://github.com/dreamanlan/il2cpp_ref/blob/09316fe508773b8ced098dae6147b44ee1f6516c/libil2cpp/il2cpp-runtime-metadata.h#L68
-// typedef struct Il2CppArraySize
-// {
-//     Il2CppObject obj;
-//     Il2CppArrayBounds* bounds;
-//     il2cpp_array_size_t max_length;
-//     ALIGN_TYPE(8) void* vector[IL2CPP_ZERO_LEN_ARRAY];
-// } Il2CppArraySize;
-//-----------------------------------------------------------------------------
 
 // Represents .NET Framework System.Array
 // May be unsafe when T is not a pointer, but generally it is.
 template <class T> 
 struct System::Array : System::Object {
+    System::Array<T>() = delete;
+    System::Array<T>(const System::Array<T>& src) = delete;
+
+    inline T*           begin()                             { return &vector[0]; }
+    inline const T*     begin() const                       { return &vector[0]; }
+    inline T*           end()                               { return &vector[length]; }
+    inline const T*     end() const                         { return &vector[length]; }
+
+    inline T&           operator[](size_t i)                { return vector[i]; }
+    inline const T&     operator[](size_t i) const          { return vector[i]; }
+    
+    static Class*       GetClass();
+    static void         Clear(System::Array<T>* pArray, Int32 index, Int32 length);
+    static void         Sort(System::Array<T>* pArray, Int32 index, Int32 length);
+
     void* pBounds;
     size_t length;
-    T vector[1]; // We dont care about instantiating Array, so 0-length is ok.
+    T vector[1];
 };
 
-// Represents .NET Framework System.Collections.Generic.Dictionary
-// Works only for .NET Framework 4
-//template <class TKey, class TValue>
-//struct System::Dictionary : System::Object {
-//    struct Entry {
-//        int32_t hashCode;
-//        int32_t next;
-//        TKey key;
-//        TValue value;
-//    };
-//public:
-//    System::Array<Entry>* GetEntries() { return entries; }
-//    int32_t Count() { return count; }
-//private:
-//    System::Array<int>* buckets;
-//    System::Array<Entry>* entries;
-//    int32_t count;
-//};
+template <class TKey, class TValue>
+struct System::Dictionary : System::Object {
+    
+};
 
 // Represents .NET Framework System.Enum
 struct System::Enum : System::Object {
+    System::Enum() = delete;
+    System::Enum(const System::Enum&) = delete;
+
+    static Class* GetClass();
     static Array<String*>* GetNames(System::Type* pType);
-    static Array<int32_t>* GetValues(System::Type* pType);
+    static Array<Int32>* GetValues(System::Type* pType);
 };
 
 template <class T> 
 struct System::List : System::Object {
+    System::List<T>() = delete;
+    System::List<T>(const System::List<T>&) = delete;
+
     Array<T>* pItems;
     Int32 length;
     Int32 version;
@@ -234,12 +250,19 @@ struct System::List : System::Object {
 };
 
 struct System::String : System::Object {
-    static System::String* New(const char* data); // l
-public:
+    System::String() = delete;
+    System::String(const System::String&) = delete;
+
+    static System::String* New(const char* data);
+
     Int32 length;
     Char chars[1];
 };
 
 struct System::Type : System::Object {
+    System::Type() = delete;
+    System::Type(const System::Type&) = delete;
+
     ::Type* pType;
 };
+

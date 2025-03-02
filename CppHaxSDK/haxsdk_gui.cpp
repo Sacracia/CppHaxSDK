@@ -24,6 +24,8 @@
 #include <d3d11.h>
 #pragma comment(lib, "d3d11.lib")
 
+
+// directx 12
 #include <d3d12.h>
 #pragma comment(lib, "d3d12.lib")
 
@@ -48,10 +50,15 @@
 #include "third_party/stb_image.h"
 
 #include "haxsdk.h"
-#include "logger/logger.h"
 
 using setCursorPos_t            = BOOL(WINAPI*)(int, int);
 using clipCursor_t              = BOOL(WINAPI*)(const RECT*);
+using setPhysicalCursorPos_t    = BOOL(WINAPI*)(int, int);
+using mouse_event_t             = void(WINAPI*)(DWORD, DWORD, DWORD, DWORD, ULONG_PTR);
+using GetCursorPos_t            = BOOL(WINAPI*)(LPPOINT);
+using SendInput_t               = UINT(WINAPI*)(UINT, LPINPUT, int);
+using SendMessageW_t            = LRESULT(WINAPI*)(HWND, UINT, WPARAM, LPARAM);
+
 using swapBuffers_t             = bool(WINAPI*)(HDC);
 using reset_t                   = HRESULT(WINAPI*)(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS*);
 using endScene_t                = HRESULT(WINAPI*)(LPDIRECT3DDEVICE9);
@@ -67,6 +74,11 @@ static HWND                             g_dummyHWND;
 static WNDPROC                          oWndproc;
 static setCursorPos_t                   oSetCursorPos;
 static clipCursor_t                     oClipCursor;
+static setPhysicalCursorPos_t           oSetPhysicalCursorPos;
+static mouse_event_t                    oMouseEvent;
+static GetCursorPos_t                   oGetCursorPos;
+static SendInput_t                      oSendInput;
+static SendMessageW_t                   oSendMessageW;
 static swapBuffers_t                    oSwapBuffers;
 static present_t                        oPresent;
 static resizeBuffers_t                  oResizeBuffers;
@@ -111,8 +123,14 @@ struct ImGuiContextParams {
 
 static LRESULT WINAPI                   HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags);
 static LRESULT WINAPI                   HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
 static BOOL WINAPI                      HookedSetCursorPos(int X, int Y);
 static BOOL WINAPI                      HookedClipCursor(const RECT* lpRect);
+static BOOL WINAPI                      HookedSetPhysicalCursorPos(int x, int y);
+static UINT WINAPI                      HookedSendInput(UINT cInputs, LPINPUT pInputs, int cbSize);
+static void WINAPI                      HookedMouseEvent(DWORD dwFlags, DWORD dx, DWORD dy, DWORD dwData, ULONG_PTR dwExtraInfo);
+static LRESULT WINAPI                   HookedSendMessageW(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam);
+
 static void                             InitImGuiContext(const ImGuiContextParams& params);
 
 namespace opengl {
@@ -313,9 +331,39 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
     oWndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
 
-    oClipCursor = (clipCursor_t)GetProcAddress(GetModuleHandleA("user32.dll"), "ClipCursor");
     DetourTransactionBegin();
-    DetourAttach(&(PVOID&)oClipCursor, HookedClipCursor);
+    DetourUpdateThread(GetCurrentThread());
+    if (HMODULE hModule = GetModuleHandleA("user32.dll")) {
+        if (oClipCursor = (clipCursor_t)GetProcAddress(hModule, "ClipCursor"))
+            DetourAttach(&(PVOID&)oClipCursor, HookedClipCursor);
+        else
+            HaxSdk::Log("Unable to hook ClipCursor");
+
+        if (oSetPhysicalCursorPos = (setPhysicalCursorPos_t)GetProcAddress(hModule, "SetPhysicalCursorPos"))
+            DetourAttach(&(PVOID&)oSetPhysicalCursorPos, HookedSetPhysicalCursorPos);
+        else
+            HaxSdk::Log("Unable to hook SetPhysicalCursorPos");
+
+        if (oSetCursorPos = (setCursorPos_t)GetProcAddress(hModule, "SetCursorPos"))
+            DetourAttach(&(PVOID&)oSetCursorPos, HookedSetCursorPos);
+        else
+            HaxSdk::Log("Unable to hook SetCursorPos");
+
+        if (oMouseEvent = (mouse_event_t)GetProcAddress(hModule, "mouse_event"))
+            DetourAttach(&(PVOID&)oMouseEvent, HookedMouseEvent);
+        else
+            HaxSdk::Log("Unable to hook mouse_event");
+
+        if (oSendInput = (SendInput_t)GetProcAddress(hModule, "SendInput"))
+            DetourAttach(&(PVOID&)oSendInput, HookedSendInput);
+        else
+            HaxSdk::Log("Unable to hook SendInput");
+
+        if (oSendMessageW = (SendMessageW_t)GetProcAddress(hModule, "SendMessageW"))
+            DetourAttach(&(PVOID&)oSendMessageW, HookedSendMessageW);
+        else
+            HaxSdk::Log("Unable to hook SendMessageW");
+    }
     DetourTransactionCommit();
 }
 
@@ -379,6 +427,22 @@ static BOOL WINAPI HookedSetCursorPos(int X, int Y) {
 
 static BOOL WINAPI HookedClipCursor(const RECT* lpRect) {
     return oClipCursor(HaxSdk::GetGlobals().visible ? NULL : lpRect);
+}
+
+static BOOL WINAPI HookedSetPhysicalCursorPos(int x, int y) {
+    return HaxSdk::GetGlobals().visible ? true : oSetPhysicalCursorPos(x, y);
+}
+
+static UINT WINAPI HookedSendInput(UINT cInputs, LPINPUT pInputs, int cbSize) {
+    return HaxSdk::GetGlobals().visible ? TRUE : oSendInput(cInputs, pInputs, cbSize);
+}
+
+static void WINAPI HookedMouseEvent(DWORD dwFlags, DWORD dx, DWORD dy, DWORD dwData, ULONG_PTR dwExtraInfo) {
+    if (!HaxSdk::GetGlobals().visible) { oMouseEvent(dwFlags, dx, dy, dwData, dwExtraInfo); }
+}
+
+static LRESULT WINAPI HookedSendMessageW(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
+    return (HaxSdk::GetGlobals().visible && Msg == 0x20) ? TRUE : oSendMessageW(hWnd, Msg, wParam, lParam);
 }
 
 namespace opengl {
@@ -661,21 +725,46 @@ namespace dx11 {
             params.graphicsApi = GraphicsApi_DirectX11;
             params.pSwapChain = pSwapChain;
             InitImGuiContext(params);
+            HaxSdk::Log("[D3D11] ImGui Context inited\n");
         }
 
         if (!g_pRenderTarget) {
             CreateRenderTarget(pSwapChain);
+            HaxSdk::Log("[D3D11] Render target created\n");
         }
-        ImGui_ImplDX11_NewFrame();
-        ImGui_ImplWin32_NewFrame();
-        ImGui::NewFrame();
-        HaxSdk::RenderBackground();
-        if (HaxSdk::GetGlobals().visible)
-            HaxSdk::RenderMenu();
-        ImGui::EndFrame();
-        ImGui::Render();
-        g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTarget, nullptr);
-        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+        static bool flag = true;
+        if (flag) {
+            flag = false;
+            ImGui_ImplDX11_NewFrame();
+            HaxSdk::Log("[D3D11] ImGui_ImplDX11_NewFrame\n");
+            ImGui_ImplWin32_NewFrame();
+            HaxSdk::Log("[D3D11] ImGui_ImplWin32_NewFrame\n");
+            ImGui::NewFrame();
+            HaxSdk::Log("[D3D11] NewFrame\n");
+            HaxSdk::RenderBackground();
+            if (HaxSdk::GetGlobals().visible)
+                HaxSdk::RenderMenu();
+            ImGui::EndFrame();
+            HaxSdk::Log("[D3D11] EndFrame\n");
+            ImGui::Render();
+            HaxSdk::Log("[D3D11] Render\n");
+            g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTarget, nullptr);
+            HaxSdk::Log("[D3D11] OMSetRenderTargets\n");
+            ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+            HaxSdk::Log("[D3D11] ImGui_ImplDX11_RenderDrawData\n");
+        }
+        else {
+            ImGui_ImplDX11_NewFrame();
+            ImGui_ImplWin32_NewFrame();
+            ImGui::NewFrame();
+            HaxSdk::RenderBackground();
+            if (HaxSdk::GetGlobals().visible)
+                HaxSdk::RenderMenu();
+            ImGui::EndFrame();
+            ImGui::Render();
+            g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTarget, nullptr);
+            ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+        }
     }
 
     static HRESULT WINAPI HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width,

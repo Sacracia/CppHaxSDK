@@ -1,44 +1,3 @@
-// [SECTION] INCLUDES
-// [SECTION] FORWARD DECLARATIONS
-// [SECTION] 
-// [SECTION] USER FACING STRUCTURES (ImGuiStyle, ImGuiIO)
-// [SECTION] MISC HELPERS/UTILITIES (Geometry functions)
-// [SECTION] MISC HELPERS/UTILITIES (String, Format, Hash functions)
-// [SECTION] MISC HELPERS/UTILITIES (File functions)
-// [SECTION] MISC HELPERS/UTILITIES (ImText* functions)
-// [SECTION] MISC HELPERS/UTILITIES (Color functions)
-// [SECTION] ImGuiStorage
-// [SECTION] ImGuiTextFilter
-// [SECTION] ImGuiTextBuffer, ImGuiTextIndex
-// [SECTION] ImGuiListClipper
-// [SECTION] STYLING
-// [SECTION] RENDER HELPERS
-// [SECTION] INITIALIZATION, SHUTDOWN
-// [SECTION] MAIN CODE (most of the code! lots of stuff, needs tidying up!)
-// [SECTION] ID STACK
-// [SECTION] INPUTS
-// [SECTION] ERROR CHECKING
-// [SECTION] ITEM SUBMISSION
-// [SECTION] LAYOUT
-// [SECTION] SCROLLING
-// [SECTION] TOOLTIPS
-// [SECTION] POPUPS
-// [SECTION] KEYBOARD/GAMEPAD NAVIGATION
-// [SECTION] DRAG AND DROP
-// [SECTION] LOGGING/CAPTURING
-// [SECTION] SETTINGS
-// [SECTION] LOCALIZATION
-// [SECTION] VIEWPORTS, PLATFORM WINDOWS
-// [SECTION] PLATFORM DEPENDENT HELPERS
-// [SECTION] METRICS/DEBUGGER WINDOW
-// [SECTION] DEBUG LOG WINDOW
-// [SECTION] OTHER DEBUG TOOLS (ITEM PICKER, ID STACK TOOL)
-
-
-//-----------------------------------------------------------------------------
-// [SECTION] INCLUDES
-//-----------------------------------------------------------------------------
-
 #include "haxsdk.h"
 
 #define WIN32_LEAN_AND_MEAN
@@ -47,23 +6,13 @@
 #include <cstdint>
 #include <iostream>
 #include <format>
-
-#include "logger/logger.h"
+#include <filesystem>
+#include <fstream>
 
 #define BACKEND_API_DECL(_RET, _FUNC, _PARAMS) using t_ ## _FUNC = _RET (*)_PARAMS; static t_ ## _FUNC _FUNC = nullptr
 #define BACKEND_API_DEF(_FUNC, _MODULE) _FUNC = (t_ ## _FUNC)GetProcAddress(_MODULE, #_FUNC); HAX_ASSERT(_FUNC, #_FUNC); std::cout << #_FUNC << ' ' << std::hex << _FUNC << '\n'
 #define BACKEND_API_DEF_OPT(_FUNC, _MODULE) _FUNC = (t_ ## _FUNC)GetProcAddress(_MODULE, #_FUNC); std::cout << #_FUNC << ' ' << std::hex << _FUNC << '\n'
 
-static HaxGlobals g_globals;
-
-HaxGlobals& HaxSdk::GetGlobals() {
-    return g_globals;
-}
-
-struct Il2CppMethod;
-struct MonoMethod;
-
-using MethodSignature = void;
 using t_mono_get_root_domain                = Domain* (*)();
 using t_mono_domain_assembly_open           = Assembly* (*)(Domain*, const char*);
 using t_mono_thread_attach                  = Thread* (*)(Domain*);
@@ -79,7 +28,7 @@ using t_mono_class_get_name                 = const char* (*)(Class*);
 using t_mono_object_get_class               = Class* (*)(System::Object*);
 using t_mono_class_get_type                 = Type* (*)(Class*);
 using t_mono_object_get_class               = Class* (*)(System::Object*);
-using t_mono_method_signature               = MethodSignature* (*)(void*);
+using t_mono_method_signature               = void* (*)(void*);
 using t_mono_method_get_name                = const char* (*)(void*);
 using t_mono_compile_method                 = void* (*)(void*);
 using t_mono_jit_info_table_find            = void* (*)(Domain*, void*);
@@ -91,14 +40,38 @@ using t_mono_vtable_get_static_field_data   = void* (*)(void*);
 using t_mono_type_get_object                = System::Type* (*)(Domain*, Type*);
 using t_mono_object_new                     = System::Object* (*)(Domain*, Class*);
 using t_mono_runtime_object_init            = void (*)(System::Object*);
-using t_mono_signature_get_return_type      = Type* (*)(MethodSignature*);
+using t_mono_signature_get_return_type      = Type* (*)(void*);
 using t_mono_type_get_name                  = char* (*)(Type*);
-using t_mono_signature_get_param_count      = uint32_t (*)(MethodSignature*);
-using t_mono_signature_get_params           = Type* (*)(MethodSignature*, void**);
+using t_mono_signature_get_param_count      = uint32_t (*)(void*);
+using t_mono_signature_get_params           = Type* (*)(void*, void**);
 using t_mono_method_get_unmanaged_thunk     = void* (*)(void*);
 using t_mono_string_to_utf8                 = char* (*)(System::String*);
 using t_mono_field_static_get_value         = void (*)(void* pVtable, Field* pField, void* pValue);
 using t_mono_field_static_set_value         = void (*)(void* pVtable, Field* pField, void* pValue);
+
+using t_il2cpp_object_new                   = System::Object* (*)(Class* pClass);
+using t_il2cpp_object_unbox                 = void* (*)(System::Object* obj);
+using t_il2cpp_runtime_object_init          = void (*)(System::Object* obj);
+using t_il2cpp_domain_get                   = Domain* (*)();
+using t_il2cpp_domain_get_assemblies        = Assembly* *(*)(Domain* domain, size_t* size);
+using t_il2cpp_thread_attach                = Thread* (*)(Domain* domain);
+using t_il2cpp_assembly_get_image           = Image* (*)(Assembly* assembly);
+using t_il2cpp_class_from_name              = Class* (*)(Image* image, const char* namespaze, const char* name);
+using t_il2cpp_class_get_type               = Type* (*)(Class* pClass);
+using t_il2cpp_class_get_methods            = Method* (*)(Class* pClass, void** ppIter);
+using t_il2cpp_type_get_object              = System::Type* (*)(Type* type);
+using t_il2cpp_type_get_name                = const char* (*)(Type* type);
+using t_il2cpp_class_get_field_from_name    = Field* (*)(Class* pClass, const char* name);
+using t_il2cpp_runtime_invoke               = System::Object* (*)(Method* pMethod, void* obj, void** params, void** exc);
+using t_il2cpp_method_get_param_count       = int32_t(*)(Method* pMethod);
+using t_il2cpp_method_get_param             = Type* (*)(Method* pMethod, uint32_t index);
+using t_il2cpp_method_get_class             = Class* (*)(Method* pMethod);
+using t_il2cpp_method_get_name              = const char* (*)(Method* pMethod);
+using t_il2cpp_method_get_return_type       = Type* (*)(Method* pMethod);
+using t_il2cpp_string_new                   = System::String* (*)(const char* str);
+using t_il2cpp_class_get_static_field_data  = void* (*)(Class*);
+using t_il2cpp_field_static_get_value       = void (*)(Field* pField, void* pValue);
+using t_il2cpp_field_static_set_value       = void (*)(Field* pField, void* pValue);
 
 static t_mono_get_root_domain               mono_get_root_domain;
 static t_mono_domain_assembly_open          mono_domain_assembly_open;
@@ -134,30 +107,6 @@ static t_mono_string_to_utf8                mono_string_to_utf8;
 static t_mono_field_static_get_value        mono_field_static_get_value;
 static t_mono_field_static_set_value        mono_field_static_set_value;
 
-using t_il2cpp_object_new                   = System::Object* (*)(Class* pClass);
-using t_il2cpp_object_unbox                 = void* (*)(System::Object* obj);
-using t_il2cpp_runtime_object_init          = void (*)(System::Object* obj);
-using t_il2cpp_domain_get                   = Domain* (*)();
-using t_il2cpp_domain_get_assemblies        = Assembly * *(*)(Domain* domain, size_t* size);
-using t_il2cpp_thread_attach                = Thread * (*)(Domain* domain);
-using t_il2cpp_assembly_get_image           = Image * (*)(Assembly* assembly);
-using t_il2cpp_class_from_name              = Class * (*)(Image* image, const char* namespaze, const char* name);
-using t_il2cpp_class_get_type               = Type * (*)(Class* pClass);
-using t_il2cpp_class_get_methods            = Method* (*)(Class* pClass, void** ppIter);
-using t_il2cpp_type_get_object              = System::Type* (*)(Type* type);
-using t_il2cpp_type_get_name                = const char* (*)(Type* type);
-using t_il2cpp_class_get_field_from_name    = Field * (*)(Class* pClass, const char* name);
-using t_il2cpp_runtime_invoke               = System::Object* (*)(Method* pMethod, void* obj, void** params, void** exc);
-using t_il2cpp_method_get_param_count       = int32_t(*)(Method* pMethod);
-using t_il2cpp_method_get_param             = Type * (*)(Method* pMethod, uint32_t index);
-using t_il2cpp_method_get_class             = Class * (*)(Method* pMethod);
-using t_il2cpp_method_get_name              = const char* (*)(Method* pMethod);
-using t_il2cpp_method_get_return_type       = Type * (*)(Method* pMethod);
-using t_il2cpp_string_new                   = System::String* (*)(const char* str);
-using t_il2cpp_class_get_static_field_data  = void* (*)(Class*);
-using t_il2cpp_field_static_get_value       = void (*)(Field* pField, void* pValue);
-using t_il2cpp_field_static_set_value       = void (*)(Field* pField, void* pValue);
-
 static t_il2cpp_object_new                  il2cpp_object_new;
 static t_il2cpp_object_unbox                il2cpp_object_unbox;
 static t_il2cpp_runtime_object_init         il2cpp_runtime_object_init;
@@ -182,20 +131,95 @@ static t_il2cpp_class_get_static_field_data il2cpp_class_get_static_field_data;
 static t_il2cpp_field_static_get_value      il2cpp_field_static_get_value;
 static t_il2cpp_field_static_set_value      il2cpp_field_static_set_value;
 
-static void DetermineBackend();
-static void DefineBackendApi();
-static void GetSignature(MonoMethod* pMethod, char* buff);
-static void GetSignature(Il2CppMethod* pMethod, char* buff);
+struct HaxLogger {
+    void Log(std::string_view message);
+    void Init(bool useConsole);
 
-void HaxSdk::InitializeCore() {
-    DetermineBackend();
-    HAX_ASSERT(g_globals.backend != HaxBackend_None, "Unable to determine unity backend");
-    DefineBackendApi();
-    UnityAttachThread();
+    std::filesystem::path filePath;
+    bool initialized = false;
+    bool useConsole = false;
+};
+
+static HaxGlobals g_globals;
+static HaxLogger g_logger;
+
+namespace System {
+    static const char* MODULE = "mscorlib";
+    static const char* NAMESPACE = "System";
 }
 
-void HaxSdk::UnityAttachThread() {
-    Domain::Main()->AttachThread();
+static void DetermineBackend();
+static void DefineBackendApi();
+static void GetIl2CppSignature(Method* pMethod, char* buff);
+static void GetMonoSignature(Method* pMethod, char* buff);
+
+namespace HaxSdk {
+    HaxGlobals& GetGlobals() {
+        return g_globals;
+    }
+
+    void InitLogger(bool useConsole) {
+        g_logger.Init(useConsole);
+    }
+
+    void Log(std::string_view text) {
+        g_logger.Log(text);
+    }
+
+    void InitializeCore() {
+        DetermineBackend();
+        HAX_ASSERT(g_globals.backend != HaxBackend_None, "Unable to determine unity backend");
+        DefineBackendApi();
+        UnityAttachThread();
+    }
+
+    void UnityAttachThread() {
+        Domain::Main()->AttachThread();
+    }
+}
+
+void HaxLogger::Log(std::string_view message) {
+    if (!initialized)
+        return;
+
+    auto t = std::time(nullptr);
+    struct tm newtime;
+    ::localtime_s(&newtime, &t);
+    std::stringstream ss{};
+    ss << std::put_time(&newtime, "%d-%m-%Y %H:%M:%S") << " [" << std::left << std::setw(7) << "DEBUG" << "] " << message;
+
+    std::ofstream file(filePath, std::ios_base::app);
+    file << ss.str();
+    file.close();
+
+    if (useConsole)
+        std::cout << ss.str();
+}
+
+void HaxLogger::Init(bool useConsole) {
+    if (initialized)
+        return;
+
+    this->useConsole = useConsole;
+    if (useConsole) {
+        AllocConsole();
+        freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
+    }
+
+    char buff[MAX_PATH];
+    GetModuleFileName(NULL, buff, MAX_PATH);
+    const auto path = std::filesystem::path(buff);
+
+    const auto logPath = path.parent_path() / "haxsdk-logs.txt";
+    const auto prevLogPath = path.parent_path() / "haxsdk-prev-logs.txt";
+
+    std::error_code errCode;
+    std::filesystem::remove(prevLogPath, errCode);
+    std::filesystem::rename(logPath, prevLogPath, errCode);
+    std::filesystem::remove(logPath, errCode);
+
+    filePath = logPath;
+    initialized = true;
 }
 
 static void DetermineBackend() {
@@ -296,6 +320,47 @@ struct Il2CppAssembly {
 struct MonoAssembly {
 };
 
+struct Il2CppType {
+    void* m_data;
+    unsigned int            m_attrs : 16;
+    int                     m_type : 8;
+    unsigned int            m_num_mods : 5;
+    unsigned int            m_byref : 1;
+    unsigned int            m_pinned : 1;
+    unsigned int            m_valuetype : 1;
+};
+
+struct Il2CppField {
+    const char* name;
+    Type* type;
+    Class* parent;
+    int32_t     offset;
+    uint32_t    token;
+};
+
+struct MonoField {
+    Type* type;
+    const char* name;
+    Class* parent;
+    int32_t     offset;
+};
+
+struct Il2CppClass {
+    Image* image;
+    void* gcDesc;
+    const char* name;
+    const char* nameSpace;
+    Type                    byvalArg;
+    Type                    thisArg;
+    void* __space[15];
+    void* staticFields;
+};
+
+struct Il2CppMethod {
+    void* ptr;
+    // <...>
+};
+
 Assembly* Assembly::Find(const char* name) {
     Assembly* pAssembly;
     if (Exists(name, pAssembly))
@@ -329,17 +394,6 @@ bool Assembly::Exists(const char* name, OUT Assembly*& pRes) {
 Image* Assembly::GetImage() {
     return g_globals.backend & HaxBackend_IL2CPP ? ((Il2CppAssembly*)this)->pImage : mono_assembly_get_image(this);
 }
-
-struct Il2CppClass {
-    Image*                  image;
-    void*                   gcDesc;
-    const char*             name;
-    const char*             nameSpace;
-    Type                    byvalArg;
-    Type                    thisArg;
-    void*                   __space[15];
-    void*                   staticFields;
-};
 
 bool Class::Exists(const char* assembly, const char* nameSpace, const char* name, OUT Class*& pClass) {
     Assembly* pAssembly;
@@ -376,7 +430,7 @@ Method* Class::FindMethod(const char* name, const char* signature) {
             }
 
             char buff[256] = {0};
-            isMono ? GetSignature((MonoMethod*)pMethod, buff) : GetSignature((Il2CppMethod*)pMethod, buff);
+            isMono ? GetMonoSignature(pMethod, buff) : GetIl2CppSignature(pMethod, buff);
             if (strcmp(signature, buff) == 0) {
                 std::cout << name << signature << ' ' << std::hex << pMethod->GetAddress() << '\n';
                 return pMethod;
@@ -388,21 +442,6 @@ Method* Class::FindMethod(const char* name, const char* signature) {
     HAX_ASSERT(false, "Method not found.\nSee logs for more information");
     return nullptr;
 }
-
-struct Il2CppField {
-    const char* name;
-    Type*       type;
-    Class*      parent;
-    int32_t     offset;
-    uint32_t    token;
-};
-
-struct MonoField {
-    Type*       type;
-    const char* name;
-    Class*      parent;
-    int32_t     offset;
-};
 
 Field* Class::FindField(const char* name) {
     Field* pField = g_globals.backend & HaxBackend_Mono ? mono_class_get_field_from_name(this, name)
@@ -464,15 +503,32 @@ void Domain::AttachThread() {
     g_globals.backend & HaxBackend_Mono ? mono_thread_attach(pDomain) : il2cpp_thread_attach(pDomain);
 }
 
-struct Il2CppType {
-    void* m_data;
-    unsigned int            m_attrs : 16;
-    int                     m_type : 8;
-    unsigned int            m_num_mods : 5;
-    unsigned int            m_byref : 1;
-    unsigned int            m_pinned : 1;
-    unsigned int            m_valuetype : 1;
-};
+namespace System {
+    Class* Enum::GetClass() {
+        static Class* pClass = Class::Find(System::MODULE, System::NAMESPACE, "Enum");
+        return pClass;
+    }
+
+    Array<String*>* Enum::GetNames(Type* pType) {
+        static HaxMethod<Array<String*>*(*)(Type*)> method(Enum::GetClass()->FindMethod("GetNames"));
+        if (HaxSdk::GetGlobals().backend & HaxBackend_Mono) {
+            void* args[] = { pType };
+            return (Array<String*>*)method.Invoke(nullptr, args);
+        }
+
+        return method.ptr(pType);
+    }
+
+    Array<Int32>* Enum::GetValues(Type* pType) {
+        static HaxMethod<Array<Int32>*(*)(Type*)> method(Enum::GetClass()->FindMethod("GetValues"));
+        if (HaxSdk::GetGlobals().backend & HaxBackend_Mono) {
+            void* args[] = { pType };
+            return (Array<Int32>*)method.Invoke(nullptr, args);
+        }
+
+        return method.ptr(pType);
+    }
+}
 
 System::Type* Type::GetSystemType() {
     return g_globals.backend & HaxBackend_Mono ? mono_type_get_object(Domain::Main(), this) : il2cpp_type_get_object(this);
@@ -491,11 +547,6 @@ void* System::Object::Unbox() {
     return g_globals.backend & HaxBackend_Mono ? mono_object_unbox(this) : il2cpp_object_unbox(this);
 }
 
-struct Il2CppMethod {
-    void* ptr;
-    // <...>
-};
-
 System::Object* Method::Invoke(void* __this, void** ppArgs) {
     return g_globals.backend & HaxBackend_Mono ? mono_runtime_invoke(this, __this, ppArgs, nullptr) : il2cpp_runtime_invoke(this, __this, ppArgs, nullptr);
 }
@@ -508,7 +559,37 @@ System::String* System::String::New(const char* data) {
     return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? mono_string_new(Domain::Main(), data) : il2cpp_string_new(data);
 }
 
-void GetSignature(MonoMethod* pMethod, char* buff) {
+template <typename T>
+Class* System::Array<T>::GetClass() {
+    static Class* pClass = Class::Find(System::MODULE, System::NAMESPACE, "Array");
+    return pClass;
+}
+
+template <typename T>
+void System::Array<T>::Clear(System::Array<T>* pArray, Int32 index, Int32 length) {
+    HaxMethod<void(*)(System::Array<T>*,Int32,Int32)> method(System::Array<T>::GetClass()->FindMethod("Clear", "System.Void(System.Array,System.Int32,System.Int32"));
+    if (HaxSdk::GetGlobals().backend & HaxBackend_Mono) {
+        void* args[] = { this, &index, &length };
+        method.Invoke(nullptr, args);
+        return;
+    }
+
+    method.ptr(this, index, length);
+}
+
+template <typename T>
+void System::Array<T>::Sort(System::Array<T>* pArray, Int32 index, Int32 length) {
+    HaxMethod<void(*)(System::Array<T>*,Int32,Int32)> method(System::Array<T>::GetClass()->FindMethod("Sort", "System.Void(System.Array,System.Int32,System.Int32)"));
+    if (HaxSdk::GetGlobals().backend & HaxBackend_Mono) {
+        void* args[] = { this, &index, &length };
+        method.Invoke(nullptr, args);
+        return;
+    }
+
+    method.ptr(this, index, length);
+}
+
+void GetMonoSignature(Method* pMethod, char* buff) {
     void* pSignature = mono_method_signature(pMethod);
     Type* pReturnType = mono_signature_get_return_type(pSignature);
     strcpy_s(buff, 255, mono_type_get_name(pReturnType));
@@ -526,7 +607,7 @@ void GetSignature(MonoMethod* pMethod, char* buff) {
     strcat_s(buff, 255, ")");
 }
 
-void GetSignature(Il2CppMethod* pMethod, char* buff) {
+void GetIl2CppSignature(Method* pMethod, char* buff) {
     strcpy_s(buff, 255, il2cpp_type_get_name(il2cpp_method_get_return_type((Method*)pMethod)));
     strcat_s(buff, 255, "(");
     uint32_t nParams = il2cpp_method_get_param_count((Method*)pMethod);

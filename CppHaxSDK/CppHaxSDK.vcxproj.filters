@@ -66,9 +66,6 @@
     <ClInclude Include="third_party\detours\x86\syelog.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="logger\logger.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl3.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
@@ -144,9 +141,6 @@
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="third_party\imgui\imgui_widgets.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="logger\logger.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="third_party\imgui\backend\imgui_impl_opengl3.cpp">
