@@ -23,6 +23,7 @@ struct HaxTexture {
 
 namespace HaxSdk {
     void            DoOnceBeforeRendering();
+    void            Shutdown();
     void            RenderMenu();
     void            RenderBackground();
     HaxTexture      LoadTextureFromResource(int32_t id);

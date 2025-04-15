@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <string_view>
+#include <type_traits>
 
 #ifndef HAX_ASSERT
 #include <assert.h>
@@ -32,7 +33,7 @@ typedef int32_t Int32;
 typedef uint32_t UInt32;
 typedef int64_t Int64;
 typedef uint64_t UInt64;
-typedef char16_t Char;
+typedef wchar_t Char;
 
 // HaxSdk custom classes and enums
 enum HaxBackend;
@@ -71,19 +72,27 @@ enum HaxBackend {
 };
 
 struct HaxGlobals {
+    void Save();
+    void Load();
+
     HaxBackend backend;
     void* backendHandle;
     bool visible = true;
     int hotkey = 0xC0;
+    int locale = 0;
     void* cheatModule;
+    void* gameHWND;
+    void* oWndProc;
 };
 
 namespace HaxSdk {
     HaxGlobals& GetGlobals();
+    void DetourAttach(void** ppPointer, void* pDetour);
+    void DetachAllHooks();
     void InitLogger(bool useConsole);
     void Log(std::string_view text);
     void InitializeCore();
-    void UnityAttachThread();
+    Thread* UnityAttachThread();
 }
 
 struct Assembly {
@@ -96,14 +105,6 @@ struct Assembly {
     Image* GetImage();
 };
 
-//-----------------------------------------------------------------------------
-// [CLASS]  TYPE
-// [MONO]   https://github.com/mono/mono/blob/0f53e9e151d92944cacab3e24ac359410c606df6/mono/metadata/metadata-internals.h#L24
-// [IL2CPP] https://github.com/dreamanlan/il2cpp_ref/blob/09316fe508773b8ced098dae6147b44ee1f6516c/libil2cpp/il2cpp-runtime-metadata.h#L69
-//-----------------------------------------------------------------------------
-
-// Represents internal mono type. See backend definitions from above.
-// The content of the class differs from backend to backend, but for us it is useless as we use Type only for getting System.Type
 struct Type {
     struct Il2CppType {
         void* data;
@@ -150,7 +151,7 @@ struct Domain {
 
     static Domain* Main();
 
-    void AttachThread();
+    Thread* AttachThread();
 };
 
 struct Field {
@@ -172,9 +173,10 @@ struct Method {
 
 template <typename T>
 struct HaxMethod {
+    HaxMethod() : ptr(nullptr), orig(nullptr), pBase(nullptr) {}
     HaxMethod(Method* pMethod) { ptr = orig = (T)pMethod->GetAddress(); pBase = pMethod; }
 
-    inline System::Object* Invoke(void* __this, void** args) { return pBase->Invoke(__this, args); }
+    System::Object* Invoke(void* __this, void** args)       { return pBase->Invoke(__this, args); }
 
     Method* pBase;
     T ptr;
@@ -184,16 +186,19 @@ struct HaxMethod {
 struct Thread {
     Thread() = delete;
     Thread(const Thread&) = delete;
+
+    void Detach();
 };
 
 struct System::Object {
     System::Object() = delete;
     System::Object(const System::Object&) = delete;
 
-    static Object* New(Class* pClass);
+    static Object*      New(Class* pClass);
 
-    System::Object* Ctor();
-    void* Unbox();
+    System::Object*     Ctor();
+    Class*              GetClass()                          { return *ppClass; }
+    void*               Unbox();
 
     Class** ppClass;
     void* monitor;
@@ -225,8 +230,36 @@ struct System::Array : System::Object {
 
 template <class TKey, class TValue>
 struct System::Dictionary : System::Object {
-    
+    TValue              GetItem(TKey key);
+    bool                ContainsKey(TKey key);
 };
+
+template<class TKey, class TValue>
+TValue System::Dictionary<TKey, TValue>::GetItem(TKey key) {
+    static Method* pFunc = this->GetClass()->FindMethod("get_Item");
+    void* args[1] = {0};
+    if constexpr (std::is_pointer_v<TKey>) {
+        args[0] = key;
+    }
+    else {
+        args[0] = &key;
+    }
+    System::Object* res = pFunc->Invoke(this, args);
+    return std::is_pointer_v<TValue> ? (TValue)res : *(TValue*)res->Unbox();
+}
+
+template<class TKey, class TValue>
+bool System::Dictionary<TKey, TValue>::ContainsKey(TKey key) {
+    static Method* pFunc = this->GetClass()->FindMethod("ContainsKey");
+    void* args[1] = {0};
+    if constexpr (std::is_pointer_v<TKey>) {
+        args[0] = key;
+    }
+    else {
+        args[0] = &key;
+    }
+    return *(bool*)pFunc->Invoke(this, args)->Unbox();
+}
 
 // Represents .NET Framework System.Enum
 struct System::Enum : System::Object {
@@ -243,6 +276,11 @@ struct System::List : System::Object {
     System::List<T>() = delete;
     System::List<T>(const System::List<T>&) = delete;
 
+    inline T*           begin()                             { return pItems->begin(); }
+    inline const T*     begin() const                       { return pItems->begin(); }
+    inline T*           end()                               { return &pItems->vector[length]; }
+    inline const T*     end() const                         { return &pItems->vector[length]; }
+
     Array<T>* pItems;
     Int32 length;
     Int32 version;
@@ -253,7 +291,14 @@ struct System::String : System::Object {
     System::String() = delete;
     System::String(const System::String&) = delete;
 
+    static Class* GetClass();
     static System::String* New(const char* data);
+    static System::String* Concat(System::String* s1, System::String* s2);
+
+    wchar_t* Data()   { return chars; }
+    Int32 Length()    { return length; }
+    const char* UTF8();
+
 
     Int32 length;
     Char chars[1];

@@ -1,5 +1,7 @@
 #include "haxsdk_unity.h"
 
+#include <cmath>
+
 namespace Unity {
     static const char* MODULE = "UnityEngine";
     static const char* NAMESPACE = "UnityEngine";
@@ -144,6 +146,24 @@ namespace Unity {
         return pClass;
     }
 
+    Object* Object::Instantiate(Object* original) {
+        static HaxMethod<Object*(*)(Object*)> method(Object::GetClass()->FindMethod("Instantiate", "UnityEngine.Object(UnityEngine.Object)"));
+        if (HaxSdk::GetGlobals().backend & HaxBackend_Mono) {
+            void* args[] = { original };
+            return (Object*)method.Invoke(nullptr, args);
+        }
+        return method.ptr(original);
+    }
+
+    Object* Object::Instantiate(Object* original, Vector3 position, Quaternion rotation) {
+        static HaxMethod<Object*(*)(Object*,Vector3,Quaternion)> method(Object::GetClass()->FindMethod("Instantiate", "UnityEngine.Object(UnityEngine.Object,UnityEngine.Vector3,UnityEngine.Quaternion)"));
+        if (HaxSdk::GetGlobals().backend & HaxBackend_Mono) {
+            void* args[] = { original, &position, &rotation };
+            return (Object*)method.Invoke(nullptr, args);
+        }
+        return method.ptr(original, position, rotation);
+    }
+
     System::Array<Object*>* Object::FindObjectsOfType(System::Type* pType) {
         static HaxMethod<System::Array<Object*>*(*)(System::Type*)> method(Object::GetClass()->FindMethod("FindObjectsOfType", "UnityEngine.Object[](System.Type)"));
         if (HaxSdk::GetGlobals().backend & HaxBackend_Mono) {
@@ -286,6 +306,21 @@ namespace Unity {
         return pType;
     }
 
+    Class* Screen::GetClass() {
+        static Class* pClass = Class::Find(MODULE, NAMESPACE, "Screen");
+        return pClass;
+    }
+
+    Int32 Screen::GetHeight() {
+        static HaxMethod<Int32(*)()> method(Screen::GetClass()->FindMethod("get_height", nullptr));
+        return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? *(Int32*)method.Invoke(nullptr, nullptr)->Unbox() : method.ptr();
+    }
+
+    Int32 Screen::GetWidth() {
+        static HaxMethod<Int32(*)()> method(Screen::GetClass()->FindMethod("get_width", nullptr));
+        return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? *(Int32*)method.Invoke(nullptr, nullptr)->Unbox() : method.ptr();
+    }
+
     Class* Transform::GetClass() {
         static Class* pClass = Class::Find(MODULE, NAMESPACE, "Transform");
         return pClass;
@@ -315,7 +350,7 @@ namespace Unity {
     void Transform::SetParent(Transform* value) {
         static HaxMethod<void(*)(Transform*,Transform*)> method(Transform::GetClass()->FindMethod("set_parent"));
         if (HaxSdk::GetGlobals().backend & HaxBackend_Mono) {
-            void* args[] = { &value };
+            void* args[] = { value };
             method.Invoke(this, args);
             return;
         }
@@ -326,6 +361,21 @@ namespace Unity {
     Vector3 Transform::GetForward() {
         static HaxMethod<Vector3(*)(Transform*)> method(Transform::GetClass()->FindMethod("get_forward"));
         return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? *(Vector3*)method.Invoke(this, nullptr)->Unbox() : method.ptr(this);
+    }
+
+    float Unity::Vector3::Distance(Unity::Vector3& a, Unity::Vector3& b) {
+        Vector3 vector = { a.x - b.x, a.y - b.y, a.z - b.z };
+        return std::sqrt(vector.x * vector.x + vector.y + vector.y + vector.z + vector.z);
+    }
+
+    float Unity::Vector3::Distance(Unity::Vector3& other) {
+        Vector3 vector = { this->x - other.x, this->y - other.y, this->z - other.z };
+        return std::sqrt(vector.x * vector.x + vector.y + vector.y + vector.z + vector.z);
+    }
+
+    float Unity::Vector3::Distance(Unity::Vector3&& other) {
+        Vector3 vector = { this->x - other.x, this->y - other.y, this->z - other.z };
+        return std::sqrt(vector.x * vector.x + vector.y + vector.y + vector.z + vector.z);
     }
 
     Class* Light::GetClass() {

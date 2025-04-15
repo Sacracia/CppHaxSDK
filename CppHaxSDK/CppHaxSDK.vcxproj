@@ -183,6 +183,7 @@
   <ItemGroup>
     <ClInclude Include="haxsdk.h" />
     <ClInclude Include="haxsdk_gui.h" />
+    <ClInclude Include="haxsdk_unity.h" />
     <ClInclude Include="mono\mono.h" />
     <ClInclude Include="mono\mono_api_classes.h" />
     <ClInclude Include="mono\mono_api_functions.h" />
@@ -211,12 +212,12 @@
     <ClInclude Include="third_party\imgui\imstb_textedit.h" />
     <ClInclude Include="third_party\imgui\imstb_truetype.h" />
     <ClInclude Include="third_party\stb_image.h" />
-    <ClInclude Include="unity\haxsdk_unity.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="haxsdk.cpp" />
     <ClCompile Include="haxsdk_gui.cpp" />
+    <ClCompile Include="haxsdk_unity.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp" />
@@ -229,7 +230,6 @@
     <ClCompile Include="third_party\imgui\imgui_draw.cpp" />
     <ClCompile Include="third_party\imgui\imgui_tables.cpp" />
     <ClCompile Include="third_party\imgui\imgui_widgets.cpp" />
-    <ClCompile Include="unity\haxsdk_unity.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="third_party\detours\x64\detours.lib" />

@@ -105,7 +105,7 @@
     <ClInclude Include="third_party\stb_image.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="unity\haxsdk_unity.h">
+    <ClInclude Include="haxsdk_unity.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -155,7 +155,7 @@
     <ClCompile Include="haxsdk_gui.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="unity\haxsdk_unity.cpp">
+    <ClCompile Include="haxsdk_unity.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

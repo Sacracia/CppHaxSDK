@@ -4,35 +4,27 @@
 
 #include "haxsdk.h"
 #include "haxsdk_gui.h"
-#include "unity/haxsdk_unity.h"
+#include "haxsdk_unity.h"
 
 #include "third_party/imgui/imgui.h"
+#include <thread>
 
 void HaxSdk::DoOnceBeforeRendering() {
 
 }
 
 void HaxSdk::RenderMenu() {
-    static bool flag = true;
-    if (flag) {
-        flag = false;
-        HaxSdk::Log("Menu must be rendered\n");
-    }
     ImGui::ShowDemoWindow();
 }
 
 void HaxSdk::RenderBackground() {
-    static bool flag = true;
-    if (flag) {
-        flag = false;
-        HaxSdk::Log("Background must be rendered\n");
-    }
+    
 }
 
 static void Start() {
-	HaxSdk::InitLogger(false);
+	HaxSdk::InitLogger(true);
 	HaxSdk::InitializeCore();
-    HaxSdk::ImplementImGui(GraphicsApi_Any);
+    HaxSdk::ImplementImGui(GraphicsApi_DirectX11);
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {

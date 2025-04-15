@@ -71,6 +71,7 @@ using setRenderTargets12_t      = void(WINAPI*)(ID3D12GraphicsCommandList*, UINT
 
 static GraphicsApi                      g_graphicsApi;
 static HWND                             g_dummyHWND;
+static Thread*                          g_unityThread;
 static WNDPROC                          oWndproc;
 static setCursorPos_t                   oSetCursorPos;
 static clipCursor_t                     oClipCursor;
@@ -82,6 +83,9 @@ static SendMessageW_t                   oSendMessageW;
 static swapBuffers_t                    oSwapBuffers;
 static present_t                        oPresent;
 static resizeBuffers_t                  oResizeBuffers;
+
+static HANDLE                           hRenderSemaphore;
+constexpr DWORD                         MAX_RENDER_THREAD_COUNT = 5;
 
 namespace dx9 {
     static reset_t                      oReset;
@@ -160,7 +164,7 @@ namespace dx12 {
     static void                         Setup();
     static void                         Render(IDXGISwapChain3* pSwapChain);
     static void                         CreateRenderTarget(IDXGISwapChain* pSwapChain);
-    static HRESULT WINAPI               HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT BufferCount, UINT Width, 
+    static HRESULT WINAPI               HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT BufferCount, UINT Width,
                                                             UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
     static void WINAPI                  HookedExecuteCommandLists(ID3D12CommandQueue* pCommandQueue, UINT NumCommandLists, ID3D12CommandList* ppCommandLists);
 }
@@ -226,9 +230,54 @@ void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
 
     if (oPresent) {
         DetourTransactionBegin();
-        DetourAttach(&(PVOID&)oPresent, HookedPresent);
+        DetourUpdateThread(GetCurrentThread());
+        HaxSdk::DetourAttach(&(PVOID&)oPresent, HookedPresent);
         DetourTransactionCommit();
     }
+}
+
+void HaxSdk::Shutdown() {
+    DetourTransactionBegin();
+    DetourUpdateThread(GetCurrentThread());
+    if (DetourDetach(&(PVOID&)oPresent, HookedPresent) == NO_ERROR)
+        HaxSdk::Log("Present was successfully dehooked\n");
+    DetourTransactionCommit();
+
+    assert(hRenderSemaphore != NULL);
+    for (uint8_t i = 0; i < MAX_RENDER_THREAD_COUNT; ++i) {
+        assert(WaitForSingleObject(hRenderSemaphore, INFINITE) == WAIT_OBJECT_0);
+    }
+    HaxSdk::Log("Render semaphore was successfully released\n");
+
+    oWndproc = (WNDPROC)SetWindowLongPtr((HWND)GetGlobals().gameHWND, GWLP_WNDPROC, (LONG_PTR)oWndproc);
+    HaxSdk::Log("oWndproc was successfully reset\n");
+
+    if (g_graphicsApi & GraphicsApi_OpenGL) {
+        ImGui_ImplOpenGL3_Shutdown();
+    }
+    if (g_graphicsApi & GraphicsApi_DirectX9) {
+        ImGui_ImplDX9_Shutdown();
+    }
+    if (g_graphicsApi & GraphicsApi_DirectX10) {
+        ImGui_ImplDX10_Shutdown();
+    }
+    if (g_graphicsApi & GraphicsApi_DirectX11) {
+        dx11::g_pRenderTarget->Release();
+        dx11::g_pRenderTarget = nullptr;
+        ImGui_ImplDX11_Shutdown();
+        HaxSdk::Log("DX11 Release");
+    }
+    if (g_graphicsApi & GraphicsApi_DirectX12) {
+        ImGui_ImplDX12_Shutdown();
+    }
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+
+    CloseHandle(hRenderSemaphore);
+
+    g_unityThread->Detach();
+
+    HaxSdk::Log("Shutdown completed\n");
 }
 
 HaxTexture HaxSdk::LoadTextureFromResource(int32_t id) {
@@ -248,21 +297,22 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
          ID3D11Device* pDevice11;
          ID3D12Device* pDevice12;
          DetourTransactionBegin();
+         DetourUpdateThread(GetCurrentThread());
          if ((g_graphicsApi & GraphicsApi_DirectX10) && pSwapChain->GetDevice(__uuidof(pDevice10), (void**)&pDevice10) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX10;
              HaxSdk::Log("GAME USES DIRECTX10\n");
-             DetourAttach(&(PVOID&)oResizeBuffers, dx10::HookedResizeBuffers);
+             HaxSdk::DetourAttach(&(PVOID&)oResizeBuffers, dx10::HookedResizeBuffers);
          }
          else if ((g_graphicsApi & GraphicsApi_DirectX11) && pSwapChain->GetDevice(__uuidof(pDevice11), (void**)&pDevice11) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX11;
              HaxSdk::Log("GAME USES DIRECTX11\n");
-             DetourAttach(&(PVOID&)oResizeBuffers, dx11::HookedResizeBuffers);
+             HaxSdk::DetourAttach(&(PVOID&)oResizeBuffers, dx11::HookedResizeBuffers);
          }
          else if ((g_graphicsApi & GraphicsApi_DirectX12) && pSwapChain->GetDevice(__uuidof(pDevice12), (void**)&pDevice12) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX12;
              HaxSdk::Log("GAME USES DIRECTX12\n");
-             DetourAttach(&(PVOID&)oResizeBuffers, dx12::HookedResizeBuffers);
-             DetourAttach(&(PVOID&)dx12::oExecuteCommandLists, dx12::HookedExecuteCommandLists);
+             HaxSdk::DetourAttach(&(PVOID&)oResizeBuffers, dx12::HookedResizeBuffers);
+             HaxSdk::DetourAttach(&(PVOID&)dx12::oExecuteCommandLists, dx12::HookedExecuteCommandLists);
          }
          else {
              g_graphicsApi = GraphicsApi_None;
@@ -270,18 +320,24 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
          DetourTransactionCommit();
     }
 
-    if (g_graphicsApi & GraphicsApi_DirectX10)
+    WaitForSingleObject(hRenderSemaphore, INFINITE);
+    if (g_graphicsApi & GraphicsApi_DirectX10) {
         dx10::Render(pSwapChain);
-    else if (g_graphicsApi & GraphicsApi_DirectX11)
+    }
+    else if (g_graphicsApi & GraphicsApi_DirectX11) {
         dx11::Render(pSwapChain);
-    else if (g_graphicsApi & GraphicsApi_DirectX12)
+    }
+    else if (g_graphicsApi & GraphicsApi_DirectX12) {
         dx12::Render((dx12::IDXGISwapChain3*)pSwapChain);
+    }
 
-    return oPresent(pSwapChain, syncInterval, flags);
+    HRESULT result = oPresent(pSwapChain, syncInterval, flags);
+    ReleaseSemaphore(hRenderSemaphore, 1, NULL);
+    return result;
 }
 
 static void InitImGuiContext(const ImGuiContextParams& params) {
-    HaxSdk::UnityAttachThread();
+    g_unityThread = Domain::Main()->AttachThread();
 
     HWND hwnd = 0;
     if (params.graphicsApi & GraphicsApi_OpenGL) {
@@ -324,6 +380,7 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
         ImGui::CreateContext();
         ImGui_ImplWin32_Init(hwnd);
     }
+    HaxSdk::GetGlobals().gameHWND = hwnd;
     HaxSdk::DoOnceBeforeRendering();
 
     ImGuiIO& io = ImGui::GetIO();
@@ -335,36 +392,43 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
     DetourUpdateThread(GetCurrentThread());
     if (HMODULE hModule = GetModuleHandleA("user32.dll")) {
         if (oClipCursor = (clipCursor_t)GetProcAddress(hModule, "ClipCursor"))
-            DetourAttach(&(PVOID&)oClipCursor, HookedClipCursor);
+            HaxSdk::DetourAttach(&(PVOID&)oClipCursor, HookedClipCursor);
         else
             HaxSdk::Log("Unable to hook ClipCursor");
 
         if (oSetPhysicalCursorPos = (setPhysicalCursorPos_t)GetProcAddress(hModule, "SetPhysicalCursorPos"))
-            DetourAttach(&(PVOID&)oSetPhysicalCursorPos, HookedSetPhysicalCursorPos);
+            HaxSdk::DetourAttach(&(PVOID&)oSetPhysicalCursorPos, HookedSetPhysicalCursorPos);
         else
             HaxSdk::Log("Unable to hook SetPhysicalCursorPos");
 
         if (oSetCursorPos = (setCursorPos_t)GetProcAddress(hModule, "SetCursorPos"))
-            DetourAttach(&(PVOID&)oSetCursorPos, HookedSetCursorPos);
+            HaxSdk::DetourAttach(&(PVOID&)oSetCursorPos, HookedSetCursorPos);
         else
             HaxSdk::Log("Unable to hook SetCursorPos");
 
         if (oMouseEvent = (mouse_event_t)GetProcAddress(hModule, "mouse_event"))
-            DetourAttach(&(PVOID&)oMouseEvent, HookedMouseEvent);
+            HaxSdk::DetourAttach(&(PVOID&)oMouseEvent, HookedMouseEvent);
         else
             HaxSdk::Log("Unable to hook mouse_event");
 
         if (oSendInput = (SendInput_t)GetProcAddress(hModule, "SendInput"))
-            DetourAttach(&(PVOID&)oSendInput, HookedSendInput);
+            HaxSdk::DetourAttach(&(PVOID&)oSendInput, HookedSendInput);
         else
             HaxSdk::Log("Unable to hook SendInput");
 
         if (oSendMessageW = (SendMessageW_t)GetProcAddress(hModule, "SendMessageW"))
-            DetourAttach(&(PVOID&)oSendMessageW, HookedSendMessageW);
+            HaxSdk::DetourAttach(&(PVOID&)oSendMessageW, HookedSendMessageW);
         else
             HaxSdk::Log("Unable to hook SendMessageW");
     }
     DetourTransactionCommit();
+
+    hRenderSemaphore = CreateSemaphore(
+        NULL,                                 // default security attributes
+        MAX_RENDER_THREAD_COUNT,              // initial count
+        MAX_RENDER_THREAD_COUNT,              // maximum count
+        NULL                                  // unnamed semaphore);
+    );
 }
 
 static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -388,7 +452,8 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 
         ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam);
         switch (uMsg) {
-        case WM_KEYUP: if (wParam != globals.hotkey) break;
+        case WM_KEYUP: 
+            if (wParam != globals.hotkey) break;
         case WM_MOUSEMOVE:
         case WM_MOUSEACTIVATE:
         case WM_MOUSEHOVER:
@@ -456,7 +521,8 @@ namespace opengl {
         }
         HaxSdk::Log(std::format("[OPENGL] wglSwapBuffers address is {}\n", (void*)oSwapBuffers));
         DetourTransactionBegin();
-        DetourAttach(&(PVOID&)oSwapBuffers, HookedSwapBuffers);
+        DetourUpdateThread(GetCurrentThread());
+        HaxSdk::DetourAttach(&(PVOID&)oSwapBuffers, HookedSwapBuffers);
         DetourTransactionCommit();
     }
 
@@ -550,8 +616,9 @@ namespace dx9 {
         d3d9->Release();
 
         DetourTransactionBegin();
-        DetourAttach(&(PVOID&)oEndScene, HookedEndScene);
-        DetourAttach(&(PVOID&)oReset, HookedReset);
+        DetourUpdateThread(GetCurrentThread());
+        HaxSdk::DetourAttach(&(PVOID&)oEndScene, HookedEndScene);
+        HaxSdk::DetourAttach(&(PVOID&)oReset, HookedReset);
         DetourTransactionCommit();
     }
 
@@ -725,46 +792,22 @@ namespace dx11 {
             params.graphicsApi = GraphicsApi_DirectX11;
             params.pSwapChain = pSwapChain;
             InitImGuiContext(params);
-            HaxSdk::Log("[D3D11] ImGui Context inited\n");
         }
 
         if (!g_pRenderTarget) {
             CreateRenderTarget(pSwapChain);
-            HaxSdk::Log("[D3D11] Render target created\n");
         }
-        static bool flag = true;
-        if (flag) {
-            flag = false;
-            ImGui_ImplDX11_NewFrame();
-            HaxSdk::Log("[D3D11] ImGui_ImplDX11_NewFrame\n");
-            ImGui_ImplWin32_NewFrame();
-            HaxSdk::Log("[D3D11] ImGui_ImplWin32_NewFrame\n");
-            ImGui::NewFrame();
-            HaxSdk::Log("[D3D11] NewFrame\n");
-            HaxSdk::RenderBackground();
-            if (HaxSdk::GetGlobals().visible)
-                HaxSdk::RenderMenu();
-            ImGui::EndFrame();
-            HaxSdk::Log("[D3D11] EndFrame\n");
-            ImGui::Render();
-            HaxSdk::Log("[D3D11] Render\n");
-            g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTarget, nullptr);
-            HaxSdk::Log("[D3D11] OMSetRenderTargets\n");
-            ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-            HaxSdk::Log("[D3D11] ImGui_ImplDX11_RenderDrawData\n");
-        }
-        else {
-            ImGui_ImplDX11_NewFrame();
-            ImGui_ImplWin32_NewFrame();
-            ImGui::NewFrame();
-            HaxSdk::RenderBackground();
-            if (HaxSdk::GetGlobals().visible)
-                HaxSdk::RenderMenu();
-            ImGui::EndFrame();
-            ImGui::Render();
-            g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTarget, nullptr);
-            ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-        }
+
+        ImGui_ImplDX11_NewFrame();
+        ImGui_ImplWin32_NewFrame();
+        ImGui::NewFrame();
+        HaxSdk::RenderBackground();
+        if (HaxSdk::GetGlobals().visible)
+            HaxSdk::RenderMenu();
+        ImGui::EndFrame();
+        ImGui::Render();
+        g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTarget, nullptr);
+        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
     }
 
     static HRESULT WINAPI HookedResizeBuffers(IDXGISwapChain* pSwapChain, UINT bufferCount, UINT width,
@@ -780,10 +823,8 @@ namespace dx11 {
         LPVOID pointerToResource = nullptr;
         DWORD sizeOfResource;
         HMODULE hCheatModule = (HMODULE)HaxSdk::GetGlobals().cheatModule;
-        HRSRC hResInfo = FindResourceW(hCheatModule, MAKEINTRESOURCEW(id), L"PNG");
-        if (hResInfo) {
-            HGLOBAL hResData = LoadResource(hCheatModule, hResInfo);
-            if (hResData) {
+        if (HRSRC hResInfo = FindResourceW(hCheatModule, MAKEINTRESOURCEW(id), L"PNG")) {
+            if (HGLOBAL hResData = LoadResource(hCheatModule, hResInfo)) {
                 pointerToResource = LockResource(hResData);
                 sizeOfResource = SizeofResource(hCheatModule, hResInfo);
             }

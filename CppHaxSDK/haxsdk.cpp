@@ -8,10 +8,17 @@
 #include <format>
 #include <filesystem>
 #include <fstream>
+#include <vector>
+
+#ifdef _WIN64
+#include "third_party/detours/x64/detours.h"
+#else
+#include "third_party/detours/x86/detours.h"
+#endif
 
 #define BACKEND_API_DECL(_RET, _FUNC, _PARAMS) using t_ ## _FUNC = _RET (*)_PARAMS; static t_ ## _FUNC _FUNC = nullptr
-#define BACKEND_API_DEF(_FUNC, _MODULE) _FUNC = (t_ ## _FUNC)GetProcAddress(_MODULE, #_FUNC); HAX_ASSERT(_FUNC, #_FUNC); std::cout << #_FUNC << ' ' << std::hex << _FUNC << '\n'
-#define BACKEND_API_DEF_OPT(_FUNC, _MODULE) _FUNC = (t_ ## _FUNC)GetProcAddress(_MODULE, #_FUNC); std::cout << #_FUNC << ' ' << std::hex << _FUNC << '\n'
+#define BACKEND_API_DEF(_FUNC, _MODULE) _FUNC = (t_ ## _FUNC)GetProcAddress(_MODULE, #_FUNC); HAX_ASSERT(_FUNC, #_FUNC)
+#define BACKEND_API_DEF_OPT(_FUNC, _MODULE) _FUNC = (t_ ## _FUNC)GetProcAddress(_MODULE, #_FUNC)
 
 using t_mono_get_root_domain                = Domain* (*)();
 using t_mono_domain_assembly_open           = Assembly* (*)(Domain*, const char*);
@@ -48,6 +55,7 @@ using t_mono_method_get_unmanaged_thunk     = void* (*)(void*);
 using t_mono_string_to_utf8                 = char* (*)(System::String*);
 using t_mono_field_static_get_value         = void (*)(void* pVtable, Field* pField, void* pValue);
 using t_mono_field_static_set_value         = void (*)(void* pVtable, Field* pField, void* pValue);
+using t_mono_thread_detach                  = void (*)(Thread*);
 
 using t_il2cpp_object_new                   = System::Object* (*)(Class* pClass);
 using t_il2cpp_object_unbox                 = void* (*)(System::Object* obj);
@@ -72,6 +80,7 @@ using t_il2cpp_string_new                   = System::String* (*)(const char* st
 using t_il2cpp_class_get_static_field_data  = void* (*)(Class*);
 using t_il2cpp_field_static_get_value       = void (*)(Field* pField, void* pValue);
 using t_il2cpp_field_static_set_value       = void (*)(Field* pField, void* pValue);
+using t_il2cpp_thread_detach                = void (*)(Thread*);
 
 static t_mono_get_root_domain               mono_get_root_domain;
 static t_mono_domain_assembly_open          mono_domain_assembly_open;
@@ -106,6 +115,7 @@ static t_mono_method_get_unmanaged_thunk    mono_method_get_unmanaged_thunk;
 static t_mono_string_to_utf8                mono_string_to_utf8;
 static t_mono_field_static_get_value        mono_field_static_get_value;
 static t_mono_field_static_set_value        mono_field_static_set_value;
+static t_mono_thread_detach                 mono_thread_detach;
 
 static t_il2cpp_object_new                  il2cpp_object_new;
 static t_il2cpp_object_unbox                il2cpp_object_unbox;
@@ -130,6 +140,7 @@ static t_il2cpp_string_new                  il2cpp_string_new;
 static t_il2cpp_class_get_static_field_data il2cpp_class_get_static_field_data;
 static t_il2cpp_field_static_get_value      il2cpp_field_static_get_value;
 static t_il2cpp_field_static_set_value      il2cpp_field_static_set_value;
+static t_il2cpp_thread_detach               il2cpp_thread_detach;
 
 struct HaxLogger {
     void Log(std::string_view message);
@@ -142,6 +153,7 @@ struct HaxLogger {
 
 static HaxGlobals g_globals;
 static HaxLogger g_logger;
+static std::vector<std::pair<void**, void*>> g_hooks;
 
 namespace System {
     static const char* MODULE = "mscorlib";
@@ -156,6 +168,19 @@ static void GetMonoSignature(Method* pMethod, char* buff);
 namespace HaxSdk {
     HaxGlobals& GetGlobals() {
         return g_globals;
+    }
+
+    void DetourAttach(void** ppPointer, void* pDetour) {
+        if (::DetourAttach(ppPointer, pDetour) == 0) {
+            g_hooks.push_back(std::make_pair(ppPointer, pDetour));
+        }
+    }
+
+    void DetachAllHooks() {
+        static bool detached = false;
+        if (!detached) {
+            std::cout << "QUIT\n";
+        }
     }
 
     void InitLogger(bool useConsole) {
@@ -173,8 +198,31 @@ namespace HaxSdk {
         UnityAttachThread();
     }
 
-    void UnityAttachThread() {
-        Domain::Main()->AttachThread();
+    Thread* UnityAttachThread() {
+        return Domain::Main()->AttachThread();
+    }
+}
+
+void HaxGlobals::Save() {
+    std::ofstream file("haxsdk.ini", std::ios::out);
+    file << std::format("Key={}\nLanguage={}", this->hotkey, this->locale).c_str();
+    file.close();
+}
+
+void HaxGlobals::Load() {
+    const std::filesystem::path ini{"haxsdk.ini"};
+    if (std::filesystem::exists(ini)) {
+        std::ifstream file("haxsdk.ini");
+        std::string line;
+        if (file.is_open()) {
+            int x;
+            while (getline(file, line)) {
+                if (sscanf_s(line.c_str(), "Language=%d", &x) == 1) { this->locale = x; }
+                if (sscanf_s(line.c_str(), "Key=%d", &x) == 1) { this->hotkey = x; }
+            }
+            HaxSdk::Log(std::format("GLOBALS LOADED: Lang={} | Key={}\n", this->locale, this->hotkey));
+            file.close();
+        }
     }
 }
 
@@ -272,6 +320,7 @@ static void DefineBackendApi() {
         BACKEND_API_DEF(il2cpp_field_static_get_value, hModule);
         BACKEND_API_DEF(il2cpp_field_static_set_value, hModule);
         BACKEND_API_DEF_OPT(il2cpp_class_get_static_field_data, hModule);
+        BACKEND_API_DEF(il2cpp_thread_detach, hModule);
     }
     else {
         BACKEND_API_DEF(mono_get_root_domain, hModule);
@@ -306,6 +355,7 @@ static void DefineBackendApi() {
         BACKEND_API_DEF(mono_string_to_utf8, hModule);
         BACKEND_API_DEF(mono_field_static_get_value, hModule);
         BACKEND_API_DEF(mono_field_static_set_value, hModule);
+        BACKEND_API_DEF(mono_thread_detach, hModule);
     }
 }
 
@@ -424,17 +474,13 @@ Method* Class::FindMethod(const char* name, const char* signature) {
     while (Method* pMethod = isMono ? mono_class_get_methods(this, &iter) : il2cpp_class_get_methods(this, &iter)) {
         const char* methodName = isMono ? mono_method_get_name(pMethod) : il2cpp_method_get_name(pMethod);
         if (strcmp(methodName, name) == 0) {
-            if (!signature || signature[0] == '\0') {
-                std::cout << name << ' ' << std::hex << pMethod->GetAddress() << '\n';
+            if (!signature || signature[0] == '\0')
                 return pMethod;
-            }
 
             char buff[256] = {0};
             isMono ? GetMonoSignature(pMethod, buff) : GetIl2CppSignature(pMethod, buff);
-            if (strcmp(signature, buff) == 0) {
-                std::cout << name << signature << ' ' << std::hex << pMethod->GetAddress() << '\n';
+            if (strcmp(signature, buff) == 0)
                 return pMethod;
-            }
         }
     }
 
@@ -444,8 +490,7 @@ Method* Class::FindMethod(const char* name, const char* signature) {
 }
 
 Field* Class::FindField(const char* name) {
-    Field* pField = g_globals.backend & HaxBackend_Mono ? mono_class_get_field_from_name(this, name)
-        : il2cpp_class_get_field_from_name(this, name);
+    Field* pField = g_globals.backend & HaxBackend_Mono ? mono_class_get_field_from_name(this, name) : il2cpp_class_get_field_from_name(this, name);
     if (!pField) {
         HaxSdk::Log(std::format("Field {} not found in {}", name, this->GetName()));
         HAX_ASSERT(false, "Field not found.\nSee logs for more information");
@@ -455,7 +500,8 @@ Field* Class::FindField(const char* name) {
 
 void* Class::FindStaticField(const char* name) {
     int32_t offset = FindField(name)->Offset();
-    return (void*)((char*)GetStaticFieldsData() + offset);
+    void* ptr = (void*)((char*)GetStaticFieldsData() + offset);
+    return ptr;
 }
 
 void* Class::GetStaticFieldsData() {
@@ -498,9 +544,9 @@ Domain* Domain::Main() {
     return g_globals.backend & HaxBackend_Mono ? mono_get_root_domain() : il2cpp_domain_get();
 }
 
-void Domain::AttachThread() {
+Thread* Domain::AttachThread() {
     Domain* pDomain = Domain::Main();
-    g_globals.backend & HaxBackend_Mono ? mono_thread_attach(pDomain) : il2cpp_thread_attach(pDomain);
+    return g_globals.backend & HaxBackend_Mono ? mono_thread_attach(pDomain) : il2cpp_thread_attach(pDomain);
 }
 
 namespace System {
@@ -534,6 +580,10 @@ System::Type* Type::GetSystemType() {
     return g_globals.backend & HaxBackend_Mono ? mono_type_get_object(Domain::Main(), this) : il2cpp_type_get_object(this);
 }
 
+void Thread::Detach() {
+    g_globals.backend& HaxBackend_Mono ? mono_thread_detach(this) : il2cpp_thread_detach(this);
+}
+
 System::Object* System::Object::New(Class* pClass) {
     return g_globals.backend & HaxBackend_Mono ? mono_object_new(Domain::Main(), pClass) : il2cpp_object_new(pClass);
 }
@@ -555,8 +605,32 @@ void* Method::GetAddress() {
     return g_globals.backend & HaxBackend_Mono ? mono_compile_method(this) : ((Il2CppMethod*)this)->ptr;
 }
 
+Class* System::String::GetClass() {
+    static Class* pClass = Class::Find(System::MODULE, System::NAMESPACE, "String");
+    return pClass;
+}
+
 System::String* System::String::New(const char* data) {
     return HaxSdk::GetGlobals().backend & HaxBackend_Mono ? mono_string_new(Domain::Main(), data) : il2cpp_string_new(data);
+}
+
+System::String* System::String::Concat(System::String* s1, System::String* s2) {
+    static HaxMethod<String*(*)(String*, String*)> method(String::GetClass()->FindMethod("Concat", "System.String(System.String,System.String)"));
+    void* args[] = { s1, s2 };
+    return (System::String*)method.Invoke(nullptr, args);
+}
+
+const char* System::String::UTF8() {
+    static char buff[256] = {0};
+
+    if (HaxSdk::GetGlobals().backend & HaxBackend_IL2CPP) {
+        memset(buff, 0, sizeof(buff));
+        int nBytesNeeded = WideCharToMultiByte(CP_UTF8, 0, this->chars, this->length, NULL, 0, NULL, NULL);
+        WideCharToMultiByte(CP_UTF8, 0, this->chars, this->length, buff, nBytesNeeded, NULL, NULL);
+        return buff;
+    }
+
+    return mono_string_to_utf8(this);
 }
 
 template <typename T>

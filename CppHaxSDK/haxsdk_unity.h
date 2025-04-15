@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../haxsdk.h"
+#include "haxsdk.h"
 
 namespace Unity {
     struct AsyncOperation;
@@ -14,27 +14,31 @@ namespace Unity {
     struct KeyCode;
     struct Light;
     struct Object;
-    struct Quaternion;
     struct Screen;
     struct Transform;
     struct Vector2;
     struct Vector3;
+    struct Quaternion;
 }
 
 namespace Unity {
     struct Object : System::Object {
         Object() = delete;
         Object(const Object&) = delete;
-    public:
+
         static ::Class*                         GetClass();
+        static Object*                          Instantiate(Object* original);
+        static Object*                          Instantiate(Object* original, Vector3 position, Quaternion rotation);;
         static System::Array<Object*>*          FindObjectsOfType(System::Type* type);
         static Object*                          FindObjectOfType(System::Type* type);
         static void                             Destroy(Object* obj, float t = 0.f);
-    public:
+
         System::String*                         GetName();
+
+        void*                                   m_CachedPtr;
     };
 
-    struct Component : Object{
+    struct Component : Object {
         Component() = delete;
         Component(const Component&) = delete;
     public:
@@ -117,7 +121,7 @@ namespace Unity {
         GameObject(const GameObject&) = delete;
     public:
         static ::Class*                         GetClass();
-        static inline GameObject*               New()                                       { return (GameObject*)System::Object::New(GetClass())->Ctor(); }
+        static inline GameObject*               New() { return (GameObject*)System::Object::New(GetClass())->Ctor(); }
         static GameObject*                      New(const char* name);
         Transform*                              GetTransform();
         void                                    SetLayer(Int32 value);
@@ -131,6 +135,12 @@ namespace Unity {
 
     struct KeyCode {
         static System::Type*                    GetSystemType();
+    };
+
+    struct Screen {
+        static Class*                           GetClass();
+        static Int32                            GetWidth();
+        static Int32                            GetHeight();
     };
 
     struct Transform : Component {
@@ -147,9 +157,26 @@ namespace Unity {
     };
 
     struct Vector3 {
+        static float                            Distance(Unity::Vector3& a, Unity::Vector3& b);
+
+        float                                   Distance(Unity::Vector3& other);
+        float                                   Distance(Unity::Vector3&& other);
+
+        Vector3                                 operator+(const Unity::Vector3& a) const    { return Vector3(x + a.x, y + a.y, z + a.z); }
+        Vector3                                 operator*(float mult) const                 { return Vector3(x * mult, y * mult, z * mult); }
+
         float x;
         float y;
         float z;
+    };
+
+    struct Quaternion {
+        static Unity::Quaternion                GetIdentity() { return Quaternion(0.f, 0.f, 0.f, 1.f); }
+
+        float x;
+        float y;
+        float z;
+        float w;
     };
 
     struct Light : Behaviour {
