@@ -31,10 +31,10 @@
 
 #ifdef _WIN64
 #include "third_party/detours/x64/detours.h"
-#pragma comment(lib, "third_party/detours/x64/detours.lib")
+#pragma comment(lib, "haxsdk/third_party/detours/x64/detours.lib")
 #else
 #include "third_party/detours/x86/detours.h"
-#pragma comment(lib, "third_party/detours/x86/detours.lib")
+#pragma comment(lib, "haxsdk/third_party/detours/x86/detours.lib")
 #endif
 
 #include "third_party/imgui/imgui.h"
@@ -231,7 +231,7 @@ void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
     if (oPresent) {
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
-        HaxSdk::DetourAttach(&(PVOID&)oPresent, HookedPresent);
+        ::DetourAttach(&(PVOID&)oPresent, HookedPresent);
         DetourTransactionCommit();
     }
 }
@@ -265,7 +265,7 @@ void HaxSdk::Shutdown() {
         dx11::g_pRenderTarget->Release();
         dx11::g_pRenderTarget = nullptr;
         ImGui_ImplDX11_Shutdown();
-        HaxSdk::Log("DX11 Release");
+        HaxSdk::Log("DX11 Release\n");
     }
     if (g_graphicsApi & GraphicsApi_DirectX12) {
         ImGui_ImplDX12_Shutdown();
@@ -301,18 +301,18 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
          if ((g_graphicsApi & GraphicsApi_DirectX10) && pSwapChain->GetDevice(__uuidof(pDevice10), (void**)&pDevice10) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX10;
              HaxSdk::Log("GAME USES DIRECTX10\n");
-             HaxSdk::DetourAttach(&(PVOID&)oResizeBuffers, dx10::HookedResizeBuffers);
+             ::DetourAttach(&(PVOID&)oResizeBuffers, dx10::HookedResizeBuffers);
          }
          else if ((g_graphicsApi & GraphicsApi_DirectX11) && pSwapChain->GetDevice(__uuidof(pDevice11), (void**)&pDevice11) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX11;
              HaxSdk::Log("GAME USES DIRECTX11\n");
-             HaxSdk::DetourAttach(&(PVOID&)oResizeBuffers, dx11::HookedResizeBuffers);
+             ::DetourAttach(&(PVOID&)oResizeBuffers, dx11::HookedResizeBuffers);
          }
          else if ((g_graphicsApi & GraphicsApi_DirectX12) && pSwapChain->GetDevice(__uuidof(pDevice12), (void**)&pDevice12) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX12;
              HaxSdk::Log("GAME USES DIRECTX12\n");
-             HaxSdk::DetourAttach(&(PVOID&)oResizeBuffers, dx12::HookedResizeBuffers);
-             HaxSdk::DetourAttach(&(PVOID&)dx12::oExecuteCommandLists, dx12::HookedExecuteCommandLists);
+             ::DetourAttach(&(PVOID&)oResizeBuffers, dx12::HookedResizeBuffers);
+             ::DetourAttach(&(PVOID&)dx12::oExecuteCommandLists, dx12::HookedExecuteCommandLists);
          }
          else {
              g_graphicsApi = GraphicsApi_None;
@@ -337,7 +337,7 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
 }
 
 static void InitImGuiContext(const ImGuiContextParams& params) {
-    g_unityThread = Domain::Main()->AttachThread();
+    g_unityThread = Domain::Root()->AttachThread();
 
     HWND hwnd = 0;
     if (params.graphicsApi & GraphicsApi_OpenGL) {
@@ -392,32 +392,32 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
     DetourUpdateThread(GetCurrentThread());
     if (HMODULE hModule = GetModuleHandleA("user32.dll")) {
         if (oClipCursor = (clipCursor_t)GetProcAddress(hModule, "ClipCursor"))
-            HaxSdk::DetourAttach(&(PVOID&)oClipCursor, HookedClipCursor);
+            ::DetourAttach(&(PVOID&)oClipCursor, HookedClipCursor);
         else
             HaxSdk::Log("Unable to hook ClipCursor");
 
         if (oSetPhysicalCursorPos = (setPhysicalCursorPos_t)GetProcAddress(hModule, "SetPhysicalCursorPos"))
-            HaxSdk::DetourAttach(&(PVOID&)oSetPhysicalCursorPos, HookedSetPhysicalCursorPos);
+            ::DetourAttach(&(PVOID&)oSetPhysicalCursorPos, HookedSetPhysicalCursorPos);
         else
             HaxSdk::Log("Unable to hook SetPhysicalCursorPos");
 
         if (oSetCursorPos = (setCursorPos_t)GetProcAddress(hModule, "SetCursorPos"))
-            HaxSdk::DetourAttach(&(PVOID&)oSetCursorPos, HookedSetCursorPos);
+            ::DetourAttach(&(PVOID&)oSetCursorPos, HookedSetCursorPos);
         else
             HaxSdk::Log("Unable to hook SetCursorPos");
 
         if (oMouseEvent = (mouse_event_t)GetProcAddress(hModule, "mouse_event"))
-            HaxSdk::DetourAttach(&(PVOID&)oMouseEvent, HookedMouseEvent);
+            ::DetourAttach(&(PVOID&)oMouseEvent, HookedMouseEvent);
         else
             HaxSdk::Log("Unable to hook mouse_event");
 
         if (oSendInput = (SendInput_t)GetProcAddress(hModule, "SendInput"))
-            HaxSdk::DetourAttach(&(PVOID&)oSendInput, HookedSendInput);
+            ::DetourAttach(&(PVOID&)oSendInput, HookedSendInput);
         else
             HaxSdk::Log("Unable to hook SendInput");
 
         if (oSendMessageW = (SendMessageW_t)GetProcAddress(hModule, "SendMessageW"))
-            HaxSdk::DetourAttach(&(PVOID&)oSendMessageW, HookedSendMessageW);
+            ::DetourAttach(&(PVOID&)oSendMessageW, HookedSendMessageW);
         else
             HaxSdk::Log("Unable to hook SendMessageW");
     }
@@ -443,6 +443,11 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
     if (uMsg == WM_KEYUP && wParam == globals.hotkey) {
         globals.visible = !globals.visible;
         io.MouseDrawCursor = globals.visible;
+    }
+
+    if (uMsg == WM_CLOSE) {
+        HaxSdk::Log("Got WM_QUIT message. Cheat should shut down\n");
+        HaxSdk::GetGlobals().shouldExit = true;
     }
 
     if (globals.visible) {
@@ -522,7 +527,7 @@ namespace opengl {
         HaxSdk::Log(std::format("[OPENGL] wglSwapBuffers address is {}\n", (void*)oSwapBuffers));
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
-        HaxSdk::DetourAttach(&(PVOID&)oSwapBuffers, HookedSwapBuffers);
+        ::DetourAttach(&(PVOID&)oSwapBuffers, HookedSwapBuffers);
         DetourTransactionCommit();
     }
 
@@ -617,8 +622,8 @@ namespace dx9 {
 
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
-        HaxSdk::DetourAttach(&(PVOID&)oEndScene, HookedEndScene);
-        HaxSdk::DetourAttach(&(PVOID&)oReset, HookedReset);
+        ::DetourAttach(&(PVOID&)oEndScene, HookedEndScene);
+        ::DetourAttach(&(PVOID&)oReset, HookedReset);
         DetourTransactionCommit();
     }
 
