@@ -1,3 +1,6 @@
+#pragma once
+
+#include <cstdint>
 
 struct Class;
 struct Field;
@@ -5,24 +8,46 @@ struct Field;
 template<typename Sig>
 class Method;
 
-struct Class
+struct MethodParams
 {
-    static Class* Find();
-    Field* GetField();
-    template<typename Sig>
-    Method<Sig> GetMethod();
+    void* BackendMethod;
+    void* Address;
+    void* Thunk;
 };
+
+namespace HaxSdk
+{
+    template <typename T>
+    T* FindStaticField();
+
+    int32_t FindField();
+
+    MethodParams FindMethod();
+
+    void* NewString();
+
+    void InitializeBackend();
+}
 
 template<typename Ret, typename... Args>
 struct Method<Ret(Args...)>
 {
-    Ret Invoke(MonoObject* obj, Args&&... args) const {
-        void* arguments[] = { Pack(std::forward<Args>(args))... };
-        MonoObject* exc = nullptr;
-        MonoObject* result = mono_runtime_invoke(m_Method, obj, arguments, &exc);
-        if (exc)
-            throw std::runtime_error("mono_runtime_invoke exception");
-
-        return Unpack<Ret>(result);
+    Method(const MethodParams& params)
+    {
+        BackendMethod = (Ret(*)(Args...))params.BackendMethod;
+        Thunk = (Ret(*)(Args...))params.Thunk;
+        Address = Original = (Ret(*)(Args...))params.Address;
     }
+
+    Ret Invoke(void* __this, const Args&... args) const;
+
+    Ret operator()(Args... args)
+    {
+        return Thunk ? Thunk(args) : Address(args);
+    }
+
+    void* BackendMethod;
+    Ret(*Address)(Args...);
+    Ret(*Original)(Args...);
+    Ret(*Thunk)(Args...);
 };

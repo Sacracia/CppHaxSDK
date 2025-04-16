@@ -1,30 +1,28 @@
+#pragma once
 
-#include <cstdint>
+#define HAX_ASSERT(expr, msg) \
+    do { \
+        if (!(expr)) { \
+            MessageBoxA(GetForegroundWindow(), msg, "Hax assertion failed", MB_ICONERROR);\
+            TerminateProcess(GetCurrentProcess(), 0xDEAD); \
+        } \
+    } while(0)
 
-using Int32 = int32_t;
-
-namespace System
+enum HaxBackend
 {
-    struct Object;
-    struct Array;
-    struct Type;
-    struct String;
-}
-
-struct System::Object
-{
-    Object(const Object&) = default;
-    Object(Object&&) noexcept = default;
-    Object& operator=(const Object&) = default;
-    Object& operator=(Object&&) noexcept = default;
-
-    operator bool() const { return m_NativePtr != nullptr; }
-    operator void* () const { return m_NativePtr; }
-
-    Int32 GetHashCode();
-    Type GetType();
-    String ToString();
-
-protected:
-    void* m_NativePtr; // MonoObject* or Il2CppObject*
+	HaxBackend_None = 0,
+	HaxBackend_Mono = 1,
+	HaxBackend_Il2cpp = 2
 };
+
+struct HaxGlobals
+{
+	void* backendHandle;
+	HaxBackend backend;
+};
+
+namespace HaxSdk
+{
+	HaxGlobals& GetGlobals();
+	void Initialize();
+}

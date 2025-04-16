@@ -181,9 +181,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="backend\haxsdk_backend.h" />
+    <ClInclude Include="backend\haxsdk_mono.h" />
     <ClInclude Include="haxsdk.h" />
     <ClInclude Include="haxsdk_gui.h" />
-    <ClInclude Include="haxsdk_unity.h" />
     <ClInclude Include="mono\mono.h" />
     <ClInclude Include="mono\mono_api_classes.h" />
     <ClInclude Include="mono\mono_api_functions.h" />
@@ -214,10 +215,10 @@
     <ClInclude Include="third_party\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="backend\haxsdk_backend.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="haxsdk.cpp" />
     <ClCompile Include="haxsdk_gui.cpp" />
-    <ClCompile Include="haxsdk_unity.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp" />
