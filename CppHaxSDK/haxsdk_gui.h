@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 typedef int GraphicsApi;
 
@@ -22,10 +23,10 @@ struct HaxTexture {
 };
 
 namespace HaxSdk {
-    void            DoOnceBeforeRendering();
+    void            AddMenuRender(std::function<void()> func);
+    void            AddBackgroundWork(std::function<void()> func);
+    void            AddInitializer(std::function<void()> func);
     void            Shutdown();
-    void            RenderMenu();
-    void            RenderBackground();
     HaxTexture      LoadTextureFromResource(int32_t id);
     void            ImplementImGui(GraphicsApi);
 }

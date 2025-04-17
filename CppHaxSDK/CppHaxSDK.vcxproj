@@ -181,10 +181,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="backend\haxsdk_backend.h" />
+    <ClInclude Include="backend\haxsdk_il2cpp.h" />
     <ClInclude Include="backend\haxsdk_mono.h" />
     <ClInclude Include="haxsdk.h" />
     <ClInclude Include="haxsdk_gui.h" />
+    <ClInclude Include="haxsdk_system.h" />
     <ClInclude Include="mono\mono.h" />
     <ClInclude Include="mono\mono_api_classes.h" />
     <ClInclude Include="mono\mono_api_functions.h" />
@@ -215,7 +216,8 @@
     <ClInclude Include="third_party\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="backend\haxsdk_backend.cpp" />
+    <ClCompile Include="backend\haxsdk_il2cpp.cpp" />
+    <ClCompile Include="backend\haxsdk_mono.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="haxsdk.cpp" />
     <ClCompile Include="haxsdk_gui.cpp" />

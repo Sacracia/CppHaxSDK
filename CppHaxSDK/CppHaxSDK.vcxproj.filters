@@ -105,10 +105,13 @@
     <ClInclude Include="third_party\stb_image.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\haxsdk_backend.h">
+    <ClInclude Include="backend\haxsdk_mono.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\haxsdk_mono.h">
+    <ClInclude Include="haxsdk_system.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="backend\haxsdk_il2cpp.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -158,7 +161,10 @@
     <ClCompile Include="haxsdk_gui.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="backend\haxsdk_backend.cpp">
+    <ClCompile Include="backend\haxsdk_mono.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="backend\haxsdk_il2cpp.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>

@@ -4,23 +4,104 @@
 #include <Windows.h>
 #include <TlHelp32.h>
 
-#include "backend/haxsdk_mono.h"
+#include <iomanip>
+#include <iostream>
+#include <filesystem>
+#include <string_view>
+#include <fstream>
 
-static HaxGlobals g_globals;
+#include "backend/haxsdk_mono.h"
+#include "backend/haxsdk_il2cpp.h"
+
+struct HaxLogger
+{
+    void Initialize(bool useConsole);
+    void Log(std::string_view message);
+    //void LogWarning(std::string_view message);
+    //void LogError(std::string_view message);
+
+private:
+    bool m_Initialized;
+    bool m_UseConsole;
+    std::filesystem::path m_LogPath;
+};
+
+static HaxGlobals g_Globals;
+static HaxLogger g_Logger;
 
 static bool GetBackend(HaxBackend& backend, void*& backendBaseAddr);
 
-HaxGlobals& GetGlobals()
+HaxGlobals& HaxSdk::GetGlobals()
 {
-	return g_globals;
+	return g_Globals;
 }
 
-void HaxSdk::Initialize()
+void HaxSdk::Initialize(bool useConsole)
 {
-	bool status = GetBackend(g_globals.backend, g_globals.backendHandle);
+    g_Logger.Initialize(useConsole);
+
+	bool status = GetBackend(g_Globals.Backend, g_Globals.BackendHandle);
 	HAX_ASSERT(status, "Unable to determine backend. Game is not Unity");
 
-	g_globals.backend == HaxBackend_Mono ? Mono::Initialize();
+    if (g_Globals.Backend == HaxBackend_Mono)
+    {
+        Mono::Initialize();
+        Mono::AttachThread();
+    }
+    else
+    {
+        Il2Cpp::Initialize();
+        Il2Cpp::AttachThread();
+    }
+}
+
+void HaxSdk::Log(std::string_view message)
+{
+    g_Logger.Log(message);
+}
+
+void HaxLogger::Initialize(bool useConsole)
+{
+    if (m_Initialized)
+        return;
+
+    m_UseConsole = useConsole;
+    if (m_UseConsole)
+    {
+        AllocConsole();
+        freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
+    }
+
+    char buff[MAX_PATH];
+    GetModuleFileName(NULL, buff, MAX_PATH);
+    const auto path = std::filesystem::path(buff);
+
+    const auto logPath = path.parent_path() / "haxsdk-logs.txt";
+    const auto prevLogPath = path.parent_path() / "haxsdk-prev-logs.txt";
+
+    std::error_code errCode;
+    std::filesystem::remove(prevLogPath, errCode);
+    std::filesystem::rename(logPath, prevLogPath, errCode);
+    std::filesystem::remove(logPath, errCode);
+
+    m_LogPath = logPath;
+    m_Initialized = true;
+}
+
+void HaxLogger::Log(std::string_view message)
+{
+    if (!m_Initialized)
+        return;
+
+    std::stringstream ss{};
+    ss << '[' << std::left << std::setw(7) << "INFO" << ":   HAXSDK] " << message << '\n';
+
+    std::ofstream file(m_LogPath, std::ios_base::app);
+    file << ss.str();
+    file.close();
+
+    if (m_UseConsole)
+        std::cout << ss.str();
 }
 
 static bool GetBackend(HaxBackend& backend, void*& backendHandle)
