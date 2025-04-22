@@ -10,15 +10,14 @@
 #include <string_view>
 #include <fstream>
 
-#include "backend/haxsdk_mono.h"
-#include "backend/haxsdk_il2cpp.h"
+#include "haxsdk_backend.h"
 
 struct HaxLogger
 {
     void Initialize(bool useConsole);
-    void Log(std::string_view message);
+    void Log(std::string_view message, std::string_view tag);
     //void LogWarning(std::string_view message);
-    //void LogError(std::string_view message);
+    void LogError(std::string_view message);
 
 private:
     bool m_Initialized;
@@ -43,21 +42,18 @@ void HaxSdk::Initialize(bool useConsole)
 	bool status = GetBackend(g_Globals.Backend, g_Globals.BackendHandle);
 	HAX_ASSERT(status, "Unable to determine backend. Game is not Unity");
 
-    if (g_Globals.Backend == HaxBackend_Mono)
-    {
-        Mono::Initialize();
-        Mono::AttachThread();
-    }
-    else
-    {
-        Il2Cpp::Initialize();
-        Il2Cpp::AttachThread();
-    }
+    HaxSdk::InitializeBackend();
+    HaxSdk::AttachThread();
 }
 
 void HaxSdk::Log(std::string_view message)
 {
-    g_Logger.Log(message);
+    g_Logger.Log(message, "INFO");
+}
+
+void HaxSdk::LogError(std::string_view message)
+{
+    g_Logger.LogError(message);
 }
 
 void HaxLogger::Initialize(bool useConsole)
@@ -88,13 +84,13 @@ void HaxLogger::Initialize(bool useConsole)
     m_Initialized = true;
 }
 
-void HaxLogger::Log(std::string_view message)
+void HaxLogger::Log(std::string_view message, std::string_view tag)
 {
     if (!m_Initialized)
         return;
 
     std::stringstream ss{};
-    ss << '[' << std::left << std::setw(7) << "INFO" << ":   HAXSDK] " << message << '\n';
+    ss << '[' << std::left << std::setw(7) << tag << ":   HAXSDK] " << message << '\n';
 
     std::ofstream file(m_LogPath, std::ios_base::app);
     file << ss.str();
@@ -102,6 +98,28 @@ void HaxLogger::Log(std::string_view message)
 
     if (m_UseConsole)
         std::cout << ss.str();
+}
+
+void HaxLogger::LogError(std::string_view message)
+{
+    if (!m_Initialized)
+        return;
+
+    if (m_UseConsole)
+    {
+        static HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+        CONSOLE_SCREEN_BUFFER_INFO info;
+        if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info))
+        {
+            WORD savedColor = info.wAttributes;
+            SetConsoleTextAttribute(console, FOREGROUND_RED | FOREGROUND_INTENSITY);
+            Log(message, "ERROR");
+            SetConsoleTextAttribute(console, savedColor);
+            return;
+        }
+    }
+
+    Log(message, "ERROR");
 }
 
 static bool GetBackend(HaxBackend& backend, void*& backendHandle)

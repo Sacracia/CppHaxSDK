@@ -181,8 +181,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="backend\haxsdk_il2cpp.h" />
-    <ClInclude Include="backend\haxsdk_mono.h" />
+    <ClInclude Include="haxsdk_backend.h" />
     <ClInclude Include="haxsdk.h" />
     <ClInclude Include="haxsdk_gui.h" />
     <ClInclude Include="haxsdk_system.h" />
@@ -216,11 +215,11 @@
     <ClInclude Include="third_party\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="backend\haxsdk_il2cpp.cpp" />
-    <ClCompile Include="backend\haxsdk_mono.cpp" />
+    <ClCompile Include="haxsdk_backend.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="haxsdk.cpp" />
     <ClCompile Include="haxsdk_gui.cpp" />
+    <ClCompile Include="haxsdk_system.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp" />
