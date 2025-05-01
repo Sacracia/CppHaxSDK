@@ -31,11 +31,21 @@
 #pragma comment(lib, "d3d12.lib")
 
 #ifdef _WIN64
-#include "third_party/detours/x64/detours.h"
-#pragma comment(lib, "third_party/detours/x64/detours.lib")
+    #if __has_include("third_party/detours/x64/detours.h")
+        #include "third_party/detours/x64/detours.h"
+        #pragma comment(lib, "third_party/detours/x64/detours.lib")
+    #else
+        #include "../third_party/detours/x64/detours.h"
+        #pragma comment(lib, "../third_party/detours/x64/detours.lib")
+    #endif
 #else
-#include "third_party/detours/x86/detours.h"
-#pragma comment(lib, "third_party/detours/x86/detours.lib")
+    #if __has_include("third_party/detours/x86/detours.h")
+        #include "third_party/detours/x86/detours.h"
+        #pragma comment(lib, "third_party/detours/x86/detours.lib")
+    #else
+        #include "../third_party/detours/x86/detours.h"
+        #pragma comment(lib, "../third_party/detours/x86/detours.lib")
+    #endif
 #endif
 
 #include "third_party/imgui/imgui.h"
@@ -51,6 +61,7 @@
 #include "third_party/stb_image.h"
 
 #include "haxsdk.h"
+#include "haxsdk_system.h"
 
 using setCursorPos_t            = BOOL(WINAPI*)(int, int);
 using clipCursor_t              = BOOL(WINAPI*)(const RECT*);
@@ -239,6 +250,18 @@ void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
     }
 }
 
+void HaxSdk::AddText(ImFont* font, const char* text, const ImVec2& pos, ImU32 col, float fontSize, TextShift shift)
+{
+    ImVec2 textSize = font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text);
+    ImDrawList* pDrawList = ImGui::GetBackgroundDrawList();
+    float xShift = shift == TextShift_Right ? 0.f : textSize.x / (float)shift;
+    pDrawList->AddText(font, fontSize, ImVec2(pos.x - xShift + 1.F, pos.y - 1.F), IM_COL32_BLACK, text);
+    pDrawList->AddText(font, fontSize, ImVec2(pos.x - xShift + 1.F, pos.y + 1.F), IM_COL32_BLACK, text);
+    pDrawList->AddText(font, fontSize, ImVec2(pos.x - xShift - 1.F, pos.y + 1.F), IM_COL32_BLACK, text);
+    pDrawList->AddText(font, fontSize, ImVec2(pos.x - xShift - 1.F, pos.y - 1.F), IM_COL32_BLACK, text);
+    pDrawList->AddText(font, fontSize, ImVec2(pos.x - xShift, pos.y), col, text);
+}
+
 void HaxSdk::AddMenuRender(std::function<void()> func)
 {
     g_menuRenderers.push_back(func);
@@ -356,7 +379,8 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
         ImGui::CreateContext();
         ImGui_ImplWin32_Init(hwnd);
     }
-    HaxSdk::GetGlobals().GameHWND = hwnd;
+    HaxSdk::GetGlobals().m_GameHWND = hwnd;
+    HaxSdk::IsMono() ? Mono::AttachThread() : Il2Cpp::AttachThread();
     for (auto& func : g_initializers)
         func();
 
@@ -417,9 +441,9 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
     io.MousePos.y = (float)position.y;
 
     auto& globals = HaxSdk::GetGlobals();
-    if (uMsg == WM_KEYUP && wParam == globals.MenuHotkey) {
-        globals.MenuVisible = !globals.MenuVisible;
-        io.MouseDrawCursor = globals.MenuVisible;
+    if (uMsg == WM_KEYUP && wParam == globals.m_MenuHotkey) {
+        globals.m_MenuVisible = !globals.m_MenuVisible;
+        io.MouseDrawCursor = globals.m_MenuVisible;
     }
 
     if (uMsg == WM_CLOSE) {
@@ -427,7 +451,7 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
         HaxSdk::GetGlobals().ShouldExit = true;
     }
 
-    if (globals.MenuVisible) {
+    if (globals.m_MenuVisible) {
         RECT rect;
         GetWindowRect(hWnd, &rect);
         HookedClipCursor(&rect);
@@ -435,7 +459,7 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
         ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam);
         switch (uMsg) {
         case WM_KEYUP: 
-            if (wParam != globals.MenuHotkey) break;
+            if (wParam != globals.m_MenuHotkey) break;
         case WM_MOUSEMOVE:
         case WM_MOUSEACTIVATE:
         case WM_MOUSEHOVER:
@@ -469,27 +493,27 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 }
 
 static BOOL WINAPI HookedSetCursorPos(int X, int Y) {
-    return HaxSdk::GetGlobals().MenuVisible ? true : oSetCursorPos(X, Y);
+    return HaxSdk::GetGlobals().m_MenuVisible ? true : oSetCursorPos(X, Y);
 }
 
 static BOOL WINAPI HookedClipCursor(const RECT* lpRect) {
-    return oClipCursor(HaxSdk::GetGlobals().MenuVisible ? NULL : lpRect);
+    return oClipCursor(HaxSdk::GetGlobals().m_MenuVisible ? NULL : lpRect);
 }
 
 static BOOL WINAPI HookedSetPhysicalCursorPos(int x, int y) {
-    return HaxSdk::GetGlobals().MenuVisible ? true : oSetPhysicalCursorPos(x, y);
+    return HaxSdk::GetGlobals().m_MenuVisible ? true : oSetPhysicalCursorPos(x, y);
 }
 
 static UINT WINAPI HookedSendInput(UINT cInputs, LPINPUT pInputs, int cbSize) {
-    return HaxSdk::GetGlobals().MenuVisible ? TRUE : oSendInput(cInputs, pInputs, cbSize);
+    return HaxSdk::GetGlobals().m_MenuVisible ? TRUE : oSendInput(cInputs, pInputs, cbSize);
 }
 
 static void WINAPI HookedMouseEvent(DWORD dwFlags, DWORD dx, DWORD dy, DWORD dwData, ULONG_PTR dwExtraInfo) {
-    if (!HaxSdk::GetGlobals().MenuVisible) { oMouseEvent(dwFlags, dx, dy, dwData, dwExtraInfo); }
+    if (!HaxSdk::GetGlobals().m_MenuVisible) { oMouseEvent(dwFlags, dx, dy, dwData, dwExtraInfo); }
 }
 
 static LRESULT WINAPI HookedSendMessageW(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
-    return (HaxSdk::GetGlobals().MenuVisible && Msg == 0x20) ? TRUE : oSendMessageW(hWnd, Msg, wParam, lParam);
+    return (HaxSdk::GetGlobals().m_MenuVisible && Msg == 0x20) ? TRUE : oSendMessageW(hWnd, Msg, wParam, lParam);
 }
 
 namespace opengl {
@@ -520,9 +544,20 @@ namespace opengl {
         ImGui::NewFrame();
         for (auto& func : g_backgroundWorkers)
             func();
-        if (HaxSdk::GetGlobals().MenuVisible)
+        if (HaxSdk::GetGlobals().m_MenuVisible)
+        {
             for (auto& func : g_menuRenderers)
-                func();
+            {
+                try
+                {
+                    func();
+                }
+                catch (System::Exception& ex)
+                {
+                    HaxSdk::LogError(std::format("{}", ex.GetMessageText()));
+                }
+            }
+        }
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -532,7 +567,7 @@ namespace opengl {
     static HaxTexture LoadTextureFromResource(int32_t id) {
         LPVOID pointerToResource = nullptr;
         DWORD sizeOfResource;
-        HMODULE hCheatModule = (HMODULE)HaxSdk::GetGlobals().CheatModule;
+        HMODULE hCheatModule = (HMODULE)HaxSdk::GetGlobals().m_CheatModule;
         HRSRC hResInfo = FindResourceW(hCheatModule, MAKEINTRESOURCEW(id), L"PNG");
         if (hResInfo) {
             HGLOBAL hResData = LoadResource(hCheatModule, hResInfo);
@@ -620,9 +655,20 @@ namespace dx9 {
         ImGui::NewFrame();
         for (auto& func : g_backgroundWorkers)
             func();
-        if (HaxSdk::GetGlobals().MenuVisible)
+        if (HaxSdk::GetGlobals().m_MenuVisible)
+        {
             for (auto& func : g_menuRenderers)
-                func();
+            {
+                try
+                {
+                    func();
+                }
+                catch (System::Exception& ex)
+                {
+                    HaxSdk::LogError(std::format("{}", ex.GetMessageText()));
+                }
+            }
+        }
         ImGui::EndFrame();
 
         ImGui::Render();
@@ -691,9 +737,20 @@ namespace dx10 {
         ImGui::NewFrame();
         for (auto& func : g_backgroundWorkers)
             func();
-        if (HaxSdk::GetGlobals().MenuVisible)
+        if (HaxSdk::GetGlobals().m_MenuVisible)
+        {
             for (auto& func : g_menuRenderers)
-                func();
+            {
+                try
+                {
+                    func();
+                }
+                catch (System::Exception& ex)
+                {
+                    HaxSdk::LogError(std::format("{}", ex.GetMessageText()));
+                }
+            }
+        }
         ImGui::EndFrame();
         ImGui::Render();
 
@@ -791,9 +848,20 @@ namespace dx11 {
         ImGui::NewFrame();
         for (auto& func : g_backgroundWorkers)
             func();
-        if (HaxSdk::GetGlobals().MenuVisible)
+        if (HaxSdk::GetGlobals().m_MenuVisible)
+        {
             for (auto& func : g_menuRenderers)
-                func();
+            {
+                try
+                {
+                    func();
+                }
+                catch (System::Exception& ex)
+                {
+                    HaxSdk::LogError(std::format("{}", ex.GetMessageText()));
+                }
+            }
+        }
         ImGui::EndFrame();
         ImGui::Render();
         g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTarget, nullptr);
@@ -812,7 +880,7 @@ namespace dx11 {
     static HaxTexture LoadTextureFromResource(int32_t id) {
         LPVOID pointerToResource = nullptr;
         DWORD sizeOfResource;
-        HMODULE hCheatModule = (HMODULE)HaxSdk::GetGlobals().CheatModule;
+        HMODULE hCheatModule = (HMODULE)HaxSdk::GetGlobals().m_CheatModule;
         if (HRSRC hResInfo = FindResourceW(hCheatModule, MAKEINTRESOURCEW(id), L"PNG")) {
             if (HGLOBAL hResData = LoadResource(hCheatModule, hResInfo)) {
                 pointerToResource = LockResource(hResData);
@@ -1010,9 +1078,20 @@ namespace dx12 {
             ImGui::NewFrame();
             for (auto& func : g_backgroundWorkers)
                 func();
-            if (HaxSdk::GetGlobals().MenuVisible)
+            if (HaxSdk::GetGlobals().m_MenuVisible)
+            {
                 for (auto& func : g_menuRenderers)
-                    func();
+                {
+                    try
+                    {
+                        func();
+                    }
+                    catch (System::Exception& ex)
+                    {
+                        HaxSdk::LogError(std::format("{}", ex.GetMessageText()));
+                    }
+                }
+            }
             ImGui::Render();
 
             UINT backBufferIdx = pSwapChain->GetCurrentBackBufferIndex();
