@@ -159,8 +159,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>
-      </PreprocessorDefinitions>
+      <PreprocessorDefinitions>UNITY_2022_3</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -181,27 +180,27 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="backend\haxsdk_il2cpp.h" />
-    <ClInclude Include="backend\haxsdk_mono.h" />
-    <ClInclude Include="haxsdk_settings.h" />
-    <ClInclude Include="backend\mono\mono_headers_def.h" />
-    <ClInclude Include="backend\mono\unity-2017.1.h" />
-    <ClInclude Include="backend\mono\unity-2017.2.h" />
-    <ClInclude Include="backend\mono\unity-2017.3.h" />
-    <ClInclude Include="backend\mono\unity-2017.4.h" />
-    <ClInclude Include="backend\mono\unity-2018.1.h" />
-    <ClInclude Include="backend\mono\unity-2018.2.h" />
-    <ClInclude Include="backend\mono\unity-2018.3.h" />
-    <ClInclude Include="backend\mono\unity-2018.4.h" />
-    <ClInclude Include="backend\mono\unity-2022.1-mbe.h" />
-    <ClInclude Include="backend\mono\unity-2022.2-mbe.h" />
-    <ClInclude Include="backend\mono\unity-2022.3-mbe.h" />
-    <ClInclude Include="backend\mono\unity-5.5.h" />
-    <ClInclude Include="backend\mono\unity-5.6.h" />
-    <ClInclude Include="haxsdk.h" />
+    <ClInclude Include="haxsdk_assertion.h" />
+    <ClInclude Include="backend\il2cpp\haxsdk_il2cpp.h" />
+    <ClInclude Include="backend\mono\headers\unity-2017.1.h" />
+    <ClInclude Include="backend\mono\headers\unity-2017.2.h" />
+    <ClInclude Include="backend\mono\headers\unity-2017.3.h" />
+    <ClInclude Include="backend\mono\headers\unity-2017.4.h" />
+    <ClInclude Include="backend\mono\headers\unity-2018.1.h" />
+    <ClInclude Include="backend\mono\headers\unity-2018.2.h" />
+    <ClInclude Include="backend\mono\headers\unity-2018.3.h" />
+    <ClInclude Include="backend\mono\headers\unity-2018.4.h" />
+    <ClInclude Include="backend\mono\headers\unity-2022.1-mbe.h" />
+    <ClInclude Include="backend\mono\headers\unity-2022.2-mbe.h" />
+    <ClInclude Include="backend\mono\headers\unity-2022.3-mbe.h" />
+    <ClInclude Include="backend\mono\headers\unity-5.5.h" />
+    <ClInclude Include="backend\mono\headers\unity-5.6.h" />
     <ClInclude Include="haxsdk_gui.h" />
+    <ClInclude Include="haxsdk_logger.h" />
+    <ClInclude Include="backend\mono\haxsdk_mono.h" />
+    <ClInclude Include="backend\haxsdk_backend.h" />
     <ClInclude Include="haxsdk_system.h" />
-    <ClInclude Include="haxsdk_unity.h" />
+    <ClInclude Include="haxsdk_tools.h" />
     <ClInclude Include="mono\mono.h" />
     <ClInclude Include="mono\mono_api_classes.h" />
     <ClInclude Include="mono\mono_api_functions.h" />
@@ -232,14 +231,15 @@
     <ClInclude Include="third_party\stb_image.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="backend\haxsdk_il2cpp.cpp" />
-    <ClCompile Include="backend\haxsdk_mono.cpp" />
-    <ClCompile Include="cheat.cpp" />
+    <ClCompile Include="backend\haxsdk_backend.cpp" />
+    <ClCompile Include="backend\il2cpp\haxsdk_il2cpp.cpp" />
+    <ClCompile Include="backend\mono\haxsdk_mono.cpp" />
     <ClCompile Include="dllmain.cpp" />
-    <ClCompile Include="haxsdk.cpp" />
+    <ClCompile Include="haxsdk_assertion.cpp" />
     <ClCompile Include="haxsdk_gui.cpp" />
+    <ClCompile Include="haxsdk_logger.cpp" />
     <ClCompile Include="haxsdk_system.cpp" />
-    <ClCompile Include="haxsdk_unity.cpp" />
+    <ClCompile Include="haxsdk_tools.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp" />
@@ -258,6 +258,7 @@
     <Library Include="third_party\detours\x86\detours.lib" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="backend\mono\headers\script.py" />
     <None Include="cpp.hint" />
     <None Include="third_party\detours\x64\detours.pdb" />
     <None Include="third_party\detours\x86\detours.pdb" />

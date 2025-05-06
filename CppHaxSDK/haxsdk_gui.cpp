@@ -60,8 +60,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "third_party/stb_image.h"
 
-#include "haxsdk.h"
+//#include "haxsdk.h"
 #include "haxsdk_system.h"
+#include "haxsdk_logger.h"
 
 using setCursorPos_t            = BOOL(WINAPI*)(int, int);
 using clipCursor_t              = BOOL(WINAPI*)(const RECT*);
@@ -94,9 +95,12 @@ static SendMessageW_t                   oSendMessageW;
 static swapBuffers_t                    oSwapBuffers;
 static present_t                        oPresent;
 static resizeBuffers_t                  oResizeBuffers;
-static std::vector<std::function<void()>> g_backgroundWorkers;
-static std::vector<std::function<void()>> g_menuRenderers;
-static std::vector<std::function<void()>> g_initializers;
+static bool                             g_MenuVisible = true;
+static int                              g_MenuHotkey = 0xC0;
+static HANDLE                           g_CheatHandle;
+static std::function<void()>            g_FnMenuRender;
+static std::function<void()>            g_FnBackground;
+static std::function<void()>            g_FnInitialize;
 
 static HANDLE                           hRenderSemaphore;
 constexpr DWORD                         MAX_RENDER_THREAD_COUNT = 5;
@@ -183,8 +187,12 @@ namespace dx12 {
     static void WINAPI                  HookedExecuteCommandLists(ID3D12CommandQueue* pCommandQueue, UINT NumCommandLists, ID3D12CommandList* ppCommandLists);
 }
 
-void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
-    g_graphicsApi = graphicsApi;
+void HaxSdk::ImplementImGui(GraphicsApi graphics, std::function<void()> fnInit, std::function<void()> fnBackground, std::function<void()> fnRender) {
+    g_graphicsApi = graphics;
+    g_FnInitialize = fnInit;
+    g_FnBackground = fnBackground;
+    g_FnMenuRender = fnRender;
+
     WNDCLASSEX dummyWindow{};
     dummyWindow.cbSize = 0;
     g_dummyHWND = GetConsoleWindow();
@@ -215,23 +223,23 @@ void HaxSdk::ImplementImGui(GraphicsApi graphicsApi) {
         do {
             std::string moduleName(me.szModule);
             std::transform(moduleName.begin(), moduleName.end(), moduleName.begin(), ::tolower);
-            if (moduleName == "opengl32.dll" && (graphicsApi & GraphicsApi_OpenGL)) {
+            if (moduleName == "opengl32.dll" && (g_graphicsApi & GraphicsApi_OpenGL)) {
                 opengl::Hook();
             }
-            if (moduleName == "d3d9.dll" && (graphicsApi & GraphicsApi_DirectX9)) {
+            if (moduleName == "d3d9.dll" && (g_graphicsApi & GraphicsApi_DirectX9)) {
                 dx9::Hook();
             }
-            if (moduleName == "d3d10.dll" && (graphicsApi & GraphicsApi_DirectX10)) {
+            if (moduleName == "d3d10.dll" && (g_graphicsApi & GraphicsApi_DirectX10)) {
                 dx10::Setup();
             }
-            if (moduleName == "d3d11.dll" && (graphicsApi & GraphicsApi_DirectX11)) {
+            if (moduleName == "d3d11.dll" && (g_graphicsApi & GraphicsApi_DirectX11)) {
                 dx11::Setup();
             }
-            if (moduleName == "d3d12.dll" && (graphicsApi & GraphicsApi_DirectX12)) {
+            if (moduleName == "d3d12.dll" && (g_graphicsApi & GraphicsApi_DirectX12)) {
                 dx12::Setup();
             }
-            if (moduleName == "vulkan-1.dll" && (graphicsApi & GraphicsApi_Vulkan)) {
-                HaxSdk::Log("VULKAN graphics api found");
+            if (moduleName == "vulkan-1.dll" && (g_graphicsApi & GraphicsApi_Vulkan)) {
+                HAX_LOG("VULKAN graphics api found");
             }
         } while (Module32Next(snapshot, &me));
     }
@@ -262,21 +270,6 @@ void HaxSdk::AddText(ImFont* font, const char* text, const ImVec2& pos, ImU32 co
     pDrawList->AddText(font, fontSize, ImVec2(pos.x - xShift, pos.y), col, text);
 }
 
-void HaxSdk::AddMenuRender(std::function<void()> func)
-{
-    g_menuRenderers.push_back(func);
-}
-
-void HaxSdk::AddBackgroundWork(std::function<void()> func)
-{
-    g_backgroundWorkers.push_back(func);
-}
-
-void HaxSdk::AddInitializer(std::function<void()> func)
-{
-    g_initializers.push_back(func);
-}
-
 void HaxSdk::Shutdown() {
     
 }
@@ -290,6 +283,11 @@ HaxTexture HaxSdk::LoadTextureFromResource(int32_t id) {
     return HaxTexture();
 }
 
+void HaxSdk::SetCheatHandle(HANDLE handle)
+{
+    g_CheatHandle = handle;
+}
+
 static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterval, UINT flags) {
     static bool inited = false;
     if (!inited) {
@@ -301,17 +299,17 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
          DetourUpdateThread(GetCurrentThread());
          if ((g_graphicsApi & GraphicsApi_DirectX10) && pSwapChain->GetDevice(__uuidof(pDevice10), (void**)&pDevice10) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX10;
-             HaxSdk::Log("GAME USES DIRECTX10");
+             HAX_LOG("GAME USES DIRECTX10");
              ::DetourAttach(&(PVOID&)oResizeBuffers, dx10::HookedResizeBuffers);
          }
          else if ((g_graphicsApi & GraphicsApi_DirectX11) && pSwapChain->GetDevice(__uuidof(pDevice11), (void**)&pDevice11) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX11;
-             HaxSdk::Log("GAME USES DIRECTX11");
+             HAX_LOG("GAME USES DIRECTX11");
              ::DetourAttach(&(PVOID&)oResizeBuffers, dx11::HookedResizeBuffers);
          }
          else if ((g_graphicsApi & GraphicsApi_DirectX12) && pSwapChain->GetDevice(__uuidof(pDevice12), (void**)&pDevice12) == S_OK) {
              g_graphicsApi = GraphicsApi_DirectX12;
-             HaxSdk::Log("GAME USES DIRECTX12");
+             HAX_LOG("GAME USES DIRECTX12");
              ::DetourAttach(&(PVOID&)oResizeBuffers, dx12::HookedResizeBuffers);
              ::DetourAttach(&(PVOID&)dx12::oExecuteCommandLists, dx12::HookedExecuteCommandLists);
          }
@@ -379,10 +377,12 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
         ImGui::CreateContext();
         ImGui_ImplWin32_Init(hwnd);
     }
-    HaxSdk::GetGlobals().m_GameHWND = hwnd;
-    HaxSdk::IsMono() ? Mono::AttachThread() : Il2Cpp::AttachThread();
-    for (auto& func : g_initializers)
-        func();
+    //HaxSdk::GetGlobals().m_GameHWND = hwnd;
+    HaxSdk::AttachThread();
+
+    ImGui::GetIO().IniFilename = nullptr;
+    if (g_FnInitialize)
+        g_FnInitialize();
 
     ImGuiIO& io = ImGui::GetIO();
     io.WantCaptureMouse = true;
@@ -395,32 +395,32 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
         if (oClipCursor = (clipCursor_t)GetProcAddress(hModule, "ClipCursor"))
             ::DetourAttach(&(PVOID&)oClipCursor, HookedClipCursor);
         else
-            HaxSdk::Log("Unable to hook ClipCursor");
+            HAX_LOG_ERROR("Unable to hook ClipCursor");
 
         if (oSetPhysicalCursorPos = (setPhysicalCursorPos_t)GetProcAddress(hModule, "SetPhysicalCursorPos"))
             ::DetourAttach(&(PVOID&)oSetPhysicalCursorPos, HookedSetPhysicalCursorPos);
         else
-            HaxSdk::Log("Unable to hook SetPhysicalCursorPos");
+            HAX_LOG_ERROR("Unable to hook SetPhysicalCursorPos");
 
         if (oSetCursorPos = (setCursorPos_t)GetProcAddress(hModule, "SetCursorPos"))
             ::DetourAttach(&(PVOID&)oSetCursorPos, HookedSetCursorPos);
         else
-            HaxSdk::Log("Unable to hook SetCursorPos");
+            HAX_LOG_ERROR("Unable to hook SetCursorPos");
 
         if (oMouseEvent = (mouse_event_t)GetProcAddress(hModule, "mouse_event"))
             ::DetourAttach(&(PVOID&)oMouseEvent, HookedMouseEvent);
         else
-            HaxSdk::Log("Unable to hook mouse_event");
+            HAX_LOG_ERROR("Unable to hook mouse_event");
 
         if (oSendInput = (SendInput_t)GetProcAddress(hModule, "SendInput"))
             ::DetourAttach(&(PVOID&)oSendInput, HookedSendInput);
         else
-            HaxSdk::Log("Unable to hook SendInput");
+            HAX_LOG_ERROR("Unable to hook SendInput");
 
         if (oSendMessageW = (SendMessageW_t)GetProcAddress(hModule, "SendMessageW"))
             ::DetourAttach(&(PVOID&)oSendMessageW, HookedSendMessageW);
         else
-            HaxSdk::Log("Unable to hook SendMessageW");
+            HAX_LOG_ERROR("Unable to hook SendMessageW");
     }
     DetourTransactionCommit();
 
@@ -440,18 +440,18 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
     io.MousePos.x = (float)position.x;
     io.MousePos.y = (float)position.y;
 
-    auto& globals = HaxSdk::GetGlobals();
-    if (uMsg == WM_KEYUP && wParam == globals.m_MenuHotkey) {
-        globals.m_MenuVisible = !globals.m_MenuVisible;
-        io.MouseDrawCursor = globals.m_MenuVisible;
+    //auto& globals = HaxSdk::GetGlobals();
+    if (uMsg == WM_KEYUP && wParam == g_MenuHotkey) {
+        g_MenuVisible = !g_MenuVisible;
+        io.MouseDrawCursor = g_MenuVisible;
     }
 
     if (uMsg == WM_CLOSE) {
-        HaxSdk::Log("Got WM_QUIT message. Cheat should shut down");
-        HaxSdk::GetGlobals().ShouldExit = true;
+        HAX_LOG_DEBUG("Got WM_QUIT message. Cheat should shut down");
+        //HaxSdk::GetGlobals().ShouldExit = true;
     }
 
-    if (globals.m_MenuVisible) {
+    if (g_MenuVisible) {
         RECT rect;
         GetWindowRect(hWnd, &rect);
         HookedClipCursor(&rect);
@@ -459,7 +459,7 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
         ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam);
         switch (uMsg) {
         case WM_KEYUP: 
-            if (wParam != globals.m_MenuHotkey) break;
+            if (wParam != g_MenuHotkey) break;
         case WM_MOUSEMOVE:
         case WM_MOUSEACTIVATE:
         case WM_MOUSEHOVER:
@@ -493,27 +493,27 @@ static LRESULT WINAPI HookedWndproc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 }
 
 static BOOL WINAPI HookedSetCursorPos(int X, int Y) {
-    return HaxSdk::GetGlobals().m_MenuVisible ? true : oSetCursorPos(X, Y);
+    return g_MenuVisible ? true : oSetCursorPos(X, Y);
 }
 
 static BOOL WINAPI HookedClipCursor(const RECT* lpRect) {
-    return oClipCursor(HaxSdk::GetGlobals().m_MenuVisible ? NULL : lpRect);
+    return oClipCursor(g_MenuVisible ? NULL : lpRect);
 }
 
 static BOOL WINAPI HookedSetPhysicalCursorPos(int x, int y) {
-    return HaxSdk::GetGlobals().m_MenuVisible ? true : oSetPhysicalCursorPos(x, y);
+    return g_MenuVisible ? true : oSetPhysicalCursorPos(x, y);
 }
 
 static UINT WINAPI HookedSendInput(UINT cInputs, LPINPUT pInputs, int cbSize) {
-    return HaxSdk::GetGlobals().m_MenuVisible ? TRUE : oSendInput(cInputs, pInputs, cbSize);
+    return g_MenuVisible ? TRUE : oSendInput(cInputs, pInputs, cbSize);
 }
 
 static void WINAPI HookedMouseEvent(DWORD dwFlags, DWORD dx, DWORD dy, DWORD dwData, ULONG_PTR dwExtraInfo) {
-    if (!HaxSdk::GetGlobals().m_MenuVisible) { oMouseEvent(dwFlags, dx, dy, dwData, dwExtraInfo); }
+    if (!g_MenuVisible) { oMouseEvent(dwFlags, dx, dy, dwData, dwExtraInfo); }
 }
 
 static LRESULT WINAPI HookedSendMessageW(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
-    return (HaxSdk::GetGlobals().m_MenuVisible && Msg == 0x20) ? TRUE : oSendMessageW(hWnd, Msg, wParam, lParam);
+    return (g_MenuVisible && Msg == 0x20) ? TRUE : oSendMessageW(hWnd, Msg, wParam, lParam);
 }
 
 namespace opengl {
@@ -522,10 +522,10 @@ namespace opengl {
 
         oSwapBuffers = (swapBuffers_t)GetProcAddress(module, "wglSwapBuffers");
         if (oSwapBuffers == 0) {
-            HaxSdk::Log("[OPENGL] Unable to find wglSwapBuffers.Hook not installed");
+            HAX_LOG_ERROR("[OPENGL] Unable to find wglSwapBuffers.Hook not installed");
             return;
         }
-        HaxSdk::Log(std::format("[OPENGL] wglSwapBuffers address is {}", (void*)oSwapBuffers));
+        HAX_LOG_DEBUG("[OPENGL] wglSwapBuffers address is {}", (void*)oSwapBuffers);
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
         ::DetourAttach(&(PVOID&)oSwapBuffers, HookedSwapBuffers);
@@ -536,28 +536,26 @@ namespace opengl {
         if (!ImGui::GetCurrentContext()) {
             ImGuiContextParams params = { GraphicsApi_OpenGL, nullptr, hdc, nullptr };
             InitImGuiContext(params);
-            HaxSdk::Log("GAME USES OPENGL");
+            HAX_LOG("GAME USES OPENGL");
         }
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-        for (auto& func : g_backgroundWorkers)
-            func();
-        if (HaxSdk::GetGlobals().m_MenuVisible)
+
+        try
         {
-            for (auto& func : g_menuRenderers)
-            {
-                try
-                {
-                    func();
-                }
-                catch (System::Exception& ex)
-                {
-                    HaxSdk::LogError(std::format("{}", ex.GetMessageText()));
-                }
-            }
+            if (g_FnBackground)
+                g_FnBackground();
+
+            if (g_MenuVisible && g_FnMenuRender)
+                g_FnMenuRender();
         }
+        catch (System::Exception& ex)
+        {
+            HaxSdk::LogError(ex.GetMessage());
+        }
+
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -567,7 +565,7 @@ namespace opengl {
     static HaxTexture LoadTextureFromResource(int32_t id) {
         LPVOID pointerToResource = nullptr;
         DWORD sizeOfResource;
-        HMODULE hCheatModule = (HMODULE)HaxSdk::GetGlobals().m_CheatModule;
+        HMODULE hCheatModule = (HMODULE)g_CheatHandle;
         HRSRC hResInfo = FindResourceW(hCheatModule, MAKEINTRESOURCEW(id), L"PNG");
         if (hResInfo) {
             HGLOBAL hResData = LoadResource(hCheatModule, hResInfo);
@@ -608,7 +606,7 @@ namespace dx9 {
 
         LPDIRECT3D9 d3d9 = ::Direct3DCreate9(D3D_SDK_VERSION);
         if (d3d9 == NULL) {
-            HaxSdk::Log("[D3D9] Direct3DCreate9 failed. Hook not installed");
+            HAX_LOG_ERROR("[D3D9] Direct3DCreate9 failed. Hook not installed");
             return;
         }
         LPDIRECT3DDEVICE9 dummyDev = NULL;
@@ -619,7 +617,7 @@ namespace dx9 {
         d3dpp.hDeviceWindow = g_dummyHWND;
         HRESULT result = d3d9->CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_NULLREF, d3dpp.hDeviceWindow, D3DCREATE_SOFTWARE_VERTEXPROCESSING, &d3dpp, &dummyDev);
         if (result != D3D_OK) {
-            HaxSdk::Log(std::format("[D3D9] IDirect3D9::CreateDevice returned {}. Hook not installed", result));
+            HAX_LOG_ERROR("[D3D9] IDirect3D9::CreateDevice returned {}. Hook not installed", result);
             d3d9->Release();
             return;
         }
@@ -628,8 +626,8 @@ namespace dx9 {
         oEndScene = (endScene_t)pVTable[42];
         oReset = (reset_t)pVTable[16];
 
-        HaxSdk::Log(std::format("[D3D9] IDirect3DDevice9::EndScene address is {}", (void*)oEndScene));
-        HaxSdk::Log(std::format("[D3D9] IDirect3DDevice9::Reset address is {}", (void*)oReset));
+        HAX_LOG_DEBUG("[D3D9] IDirect3DDevice9::EndScene address is {}", (void*)oEndScene);
+        HAX_LOG_DEBUG("[D3D9] IDirect3DDevice9::Reset address is {}", (void*)oReset);
 
         dummyDev->Release();
         d3d9->Release();
@@ -647,28 +645,26 @@ namespace dx9 {
             inited = true;
             ImGuiContextParams params = { GraphicsApi_DirectX9, pDevice, 0, nullptr };
             InitImGuiContext(params);
-            HaxSdk::Log("GAME USES DIRECTX9");
+            HAX_LOG("GAME USES DIRECTX9");
         }
 
         ImGui_ImplDX9_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-        for (auto& func : g_backgroundWorkers)
-            func();
-        if (HaxSdk::GetGlobals().m_MenuVisible)
+
+        try
         {
-            for (auto& func : g_menuRenderers)
-            {
-                try
-                {
-                    func();
-                }
-                catch (System::Exception& ex)
-                {
-                    HaxSdk::LogError(std::format("{}", ex.GetMessageText()));
-                }
-            }
+            if (g_FnBackground)
+                g_FnBackground();
+
+            if (g_MenuVisible && g_FnMenuRender)
+                g_FnMenuRender();
         }
+        catch (System::Exception& ex)
+        {
+            HaxSdk::LogError(ex.GetMessage());
+        }
+
         ImGui::EndFrame();
 
         ImGui::Render();
@@ -705,7 +701,7 @@ namespace dx10 {
         ID3D10Device* pDevice;
         HRESULT result = D3D10CreateDeviceAndSwapChain(NULL, D3D10_DRIVER_TYPE_NULL, NULL, 0, D3D10_SDK_VERSION, &swapChainDesc, &pSwapChain, &pDevice);
         if (result != S_OK) {
-            HaxSdk::Log(std::format("[D3D10] D3D10CreateDeviceAndSwapChain returned {}. Hook not installed", result));
+            HAX_LOG_ERROR("[D3D10] D3D10CreateDeviceAndSwapChain returned {}. Hook not installed", result);
             return;
         }
 
@@ -713,8 +709,8 @@ namespace dx10 {
         oPresent = (present_t)pVTable[8];
         oResizeBuffers = (resizeBuffers_t)pVTable[13];
 
-        HaxSdk::Log(std::format("[D3D10] Present address is {}", (void*)oPresent));
-        HaxSdk::Log(std::format("[D3D10] ResizeBuffers address is {}", (void*)oResizeBuffers));
+        HAX_LOG_DEBUG("[D3D10] Present address is {}", (void*)oPresent);
+        HAX_LOG_DEBUG("[D3D10] ResizeBuffers address is {}", (void*)oResizeBuffers);
 
         pSwapChain->Release();
         pDevice->Release();
@@ -735,22 +731,20 @@ namespace dx10 {
         ImGui_ImplDX10_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-        for (auto& func : g_backgroundWorkers)
-            func();
-        if (HaxSdk::GetGlobals().m_MenuVisible)
+
+        try
         {
-            for (auto& func : g_menuRenderers)
-            {
-                try
-                {
-                    func();
-                }
-                catch (System::Exception& ex)
-                {
-                    HaxSdk::LogError(std::format("{}", ex.GetMessageText()));
-                }
-            }
+            if (g_FnBackground)
+                g_FnBackground();
+
+            if (g_MenuVisible && g_FnMenuRender)
+                g_FnMenuRender();
         }
+        catch (System::Exception& ex)
+        {
+            HaxSdk::LogError(ex.GetMessage());
+        }
+
         ImGui::EndFrame();
         ImGui::Render();
 
@@ -803,7 +797,7 @@ namespace dx11 {
         };
         HRESULT result = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_NULL, NULL, 0, featureLevels, 2, D3D11_SDK_VERSION, &swapChainDesc, &pSwapChain, &pDevice, nullptr, &g_pDeviceContext);
         if (result != S_OK) {
-            HaxSdk::Log(std::format("[D3D11] D3D11CreateDeviceAndSwapChain returned {}. Hook not installed", result));
+            HAX_LOG_ERROR("[D3D11] D3D11CreateDeviceAndSwapChain returned {}. Hook not installed", result);
             return;
         }
 
@@ -814,8 +808,8 @@ namespace dx11 {
         pSwapChain->Release();
         pDevice->Release();
 
-        HaxSdk::Log(std::format("[D3D11] Present address is {}", (void*)oPresent));
-        HaxSdk::Log(std::format("[D3D11] ResizeBuffers address is {}", (void*)oResizeBuffers));
+        HAX_LOG_DEBUG("[D3D11] Present address is {}", (void*)oPresent);
+        HAX_LOG_DEBUG("[D3D11] ResizeBuffers address is {}", (void*)oResizeBuffers);
     }
 
     static void CreateRenderTarget(IDXGISwapChain* pSwapChain) {
@@ -846,22 +840,20 @@ namespace dx11 {
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-        for (auto& func : g_backgroundWorkers)
-            func();
-        if (HaxSdk::GetGlobals().m_MenuVisible)
+
+        try
         {
-            for (auto& func : g_menuRenderers)
-            {
-                try
-                {
-                    func();
-                }
-                catch (System::Exception& ex)
-                {
-                    HaxSdk::LogError(std::format("{}", ex.GetMessageText()));
-                }
-            }
+            if (g_FnBackground)
+                g_FnBackground();
+
+            if (g_MenuVisible && g_FnMenuRender)
+                g_FnMenuRender();
         }
+        catch (System::Exception& ex)
+        {
+            HaxSdk::LogError(ex.GetMessage());
+        }
+
         ImGui::EndFrame();
         ImGui::Render();
         g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTarget, nullptr);
@@ -880,7 +872,7 @@ namespace dx11 {
     static HaxTexture LoadTextureFromResource(int32_t id) {
         LPVOID pointerToResource = nullptr;
         DWORD sizeOfResource;
-        HMODULE hCheatModule = (HMODULE)HaxSdk::GetGlobals().m_CheatModule;
+        HMODULE hCheatModule = (HMODULE)g_CheatHandle;
         if (HRSRC hResInfo = FindResourceW(hCheatModule, MAKEINTRESOURCEW(id), L"PNG")) {
             if (HGLOBAL hResData = LoadResource(hCheatModule, hResInfo)) {
                 pointerToResource = LockResource(hResData);
@@ -952,7 +944,7 @@ namespace dx12 {
         if (swapChain1->QueryInterface(IID_PPV_ARGS(&g_pSwapChain)) != S_OK) { return; }
         for (UINT i = 0; i < NUM_BACK_BUFFERS; ++i) {
             if (g_pd3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&g_commandAllocators[i])) != S_OK) {
-                HaxSdk::Log("CreateCommandAllocator failed");
+                HAX_LOG_DEBUG("CreateCommandAllocator failed");
                 return;
             }
         }
@@ -969,9 +961,9 @@ namespace dx12 {
         oResizeBuffers = (resizeBuffers_t)pVTable[13];
         oExecuteCommandLists = (executeCommandLists_t)pCommandQueueVTable[10];
 
-        HaxSdk::Log(std::format("[D3D12] oPresent address is {}", (void*)oPresent));
-        HaxSdk::Log(std::format("[D3D12] oResizeBuffers is {}", (void*)oResizeBuffers));
-        HaxSdk::Log(std::format("[D3D12] oExecuteCommandLists is {}", (void*)oExecuteCommandLists));
+        HAX_LOG_DEBUG("[D3D12] oPresent address is {}", (void*)oPresent);
+        HAX_LOG_DEBUG("[D3D12] oResizeBuffers is {}", (void*)oResizeBuffers);
+        HAX_LOG_DEBUG("[D3D12] oExecuteCommandLists is {}", (void*)oExecuteCommandLists);
 
         if (g_pd3dCommandQueue) {
             g_pd3dCommandQueue->Release();
@@ -1076,22 +1068,20 @@ namespace dx12 {
             ImGui_ImplDX12_NewFrame();
             ImGui_ImplWin32_NewFrame();
             ImGui::NewFrame();
-            for (auto& func : g_backgroundWorkers)
-                func();
-            if (HaxSdk::GetGlobals().m_MenuVisible)
+
+            try
             {
-                for (auto& func : g_menuRenderers)
-                {
-                    try
-                    {
-                        func();
-                    }
-                    catch (System::Exception& ex)
-                    {
-                        HaxSdk::LogError(std::format("{}", ex.GetMessageText()));
-                    }
-                }
+                if (g_FnBackground)
+                    g_FnBackground();
+
+                if (g_MenuVisible && g_FnMenuRender)
+                    g_FnMenuRender();
             }
+            catch (System::Exception& ex)
+            {
+                HaxSdk::LogError(ex.GetMessage());
+            }
+
             ImGui::Render();
 
             UINT backBufferIdx = pSwapChain->GetCurrentBackBufferIndex();

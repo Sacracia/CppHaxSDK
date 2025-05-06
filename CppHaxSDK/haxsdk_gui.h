@@ -5,6 +5,8 @@
 
 #include "third_party/imgui/imgui.h"
 
+using HANDLE = void*;
+
 typedef int GraphicsApi;
 
 enum GraphicsApi_ 
@@ -122,11 +124,10 @@ private:
 };
 
 namespace HaxSdk {
-    void            AddMenuRender(std::function<void()> func);
-    void            AddBackgroundWork(std::function<void()> func);
-    void            AddInitializer(std::function<void()> func);
     void            Shutdown();
     HaxTexture      LoadTextureFromResource(int32_t id);
-    void            ImplementImGui(GraphicsApi);
+    void            ImplementImGui(GraphicsApi graphics, std::function<void()> fnInit, std::function<void()> fnBackground, std::function<void()> fnRender);
     void            AddText(ImFont* font, const char* text, const ImVec2& pos, ImU32 col, float fontSize, TextShift shift);
+
+    void            SetCheatHandle(HANDLE handle);
 }

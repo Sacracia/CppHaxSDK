@@ -96,70 +96,70 @@
     <ClInclude Include="mono\mono_game_functions.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="haxsdk.h">
+    <ClInclude Include="third_party\stb_image.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="haxsdk_logger.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="haxsdk_gui.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="third_party\stb_image.h">
+    <ClInclude Include="backend\mono\haxsdk_mono.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\haxsdk_mono.h">
+    <ClInclude Include="backend\haxsdk_backend.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\haxsdk_il2cpp.h">
+    <ClInclude Include="backend\il2cpp\haxsdk_il2cpp.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-5.6.h">
+    <ClInclude Include="backend\mono\headers\unity-2022.3-mbe.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-2018.1.h">
+    <ClInclude Include="backend\mono\headers\unity-5.5.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-2018.2.h">
+    <ClInclude Include="backend\mono\headers\unity-5.6.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-2018.3.h">
+    <ClInclude Include="backend\mono\headers\unity-2017.1.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-2018.4.h">
+    <ClInclude Include="backend\mono\headers\unity-2017.2.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-2022.1-mbe.h">
+    <ClInclude Include="backend\mono\headers\unity-2017.3.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\mono_headers_def.h">
+    <ClInclude Include="backend\mono\headers\unity-2017.4.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-5.5.h">
+    <ClInclude Include="backend\mono\headers\unity-2018.1.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-2022.2-mbe.h">
+    <ClInclude Include="backend\mono\headers\unity-2018.2.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-2022.3-mbe.h">
+    <ClInclude Include="backend\mono\headers\unity-2018.3.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-2017.1.h">
+    <ClInclude Include="backend\mono\headers\unity-2018.4.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-2017.2.h">
+    <ClInclude Include="backend\mono\headers\unity-2022.1-mbe.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-2017.3.h">
+    <ClInclude Include="backend\mono\headers\unity-2022.2-mbe.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\mono\unity-2017.4.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="haxsdk_settings.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
-    <ClInclude Include="haxsdk_unity.h">
+    <ClInclude Include="haxsdk_assertion.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
     <ClInclude Include="haxsdk_system.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="haxsdk_tools.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -203,25 +203,28 @@
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="haxsdk.cpp">
+    <ClCompile Include="haxsdk_logger.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="haxsdk_gui.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="backend\haxsdk_mono.cpp">
+    <ClCompile Include="backend\mono\haxsdk_mono.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="backend\haxsdk_il2cpp.cpp">
+    <ClCompile Include="backend\haxsdk_backend.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="haxsdk_unity.cpp">
+    <ClCompile Include="backend\il2cpp\haxsdk_il2cpp.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="haxsdk_system.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="cheat.cpp">
+    <ClCompile Include="haxsdk_assertion.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="haxsdk_tools.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
@@ -233,5 +236,6 @@
     <None Include="third_party\detours\x86\detours.pdb" />
     <None Include="third_party\detours\x64\detours.pdb" />
     <None Include="cpp.hint" />
+    <None Include="backend\mono\headers\script.py" />
   </ItemGroup>
 </Project>

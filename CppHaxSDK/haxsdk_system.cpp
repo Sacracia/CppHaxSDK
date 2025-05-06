@@ -1,344 +1,197 @@
 #include "haxsdk_system.h"
 
 #include <format>
+#include <unordered_map>
+#include <vector>
 
-#include "haxsdk.h"
-#include "backend/haxsdk_il2cpp.h"
-#include "backend/haxsdk_mono.h"
+#include "haxsdk_assertion.h"
+#include "haxsdk_logger.h"
 
-template <>
-System::Type typeof<int>()
+struct FieldData
 {
-    static auto type = System::Assembly::GetMscorlib().GetType("System", "Int32", true);
-    return type;
+    System::FieldInfo& field;
+    const char* assembly;
+    const char* nameSpace;
+    const char* klass;
+    const char* name;
+};
+
+struct MethodData
+{
+    System::MethodInfo& method;
+    const char* assembly;
+    const char* nameSpace;
+    const char* klass;
+    const char* name;
+    const char* signature;
+};
+
+struct TypeData
+{
+    System::Type& type;
+    const char* assembly;
+    const char* nameSpace;
+    const char* name;
+};
+
+static std::unordered_map<backend::ReflectionType*, backend::Class*> g_TypeToClass;
+static std::vector<FieldData> g_PreInitFields;
+static std::vector<MethodData> g_PreInitMethods;
+static std::vector<TypeData> g_PreInitTypes;
+static bool g_Initialized;
+
+namespace HaxSdk
+{
+    void InitSystem()
+    {
+        if (!g_Initialized)
+        {
+            g_Initialized = true;
+            HaxSdk::AttachThread();
+
+            typeof<int> = HaxSdk::GetMscorlib().GetType("System", "Int32", true);
+
+            for (const auto& data : g_PreInitFields)
+            {
+                data.field = System::AppDomain::GetRootDomain().Load(data.assembly, true).GetType(data.nameSpace, data.klass, true).GetField(data.name, true);
+                HAX_LOG_DEBUG("[PREFIELD] {}.{}.{} {}", data.nameSpace, data.klass, data.name, (void*)data.field.m_Field);
+            }
+
+            for (const auto& data : g_PreInitMethods)
+            {
+                data.method = System::AppDomain::GetRootDomain().Load(data.assembly, true).GetType(data.nameSpace, data.klass, true).GetMethod(data.name, data.signature, true);
+                HAX_LOG_DEBUG("[PREMETHOD] {}.{}.{} {}", data.nameSpace, data.klass, data.name, (void*)data.method.m_Method);
+            }
+
+            for (const auto& data : g_PreInitTypes)
+            {
+                data.type = System::AppDomain::GetRootDomain().Load(data.assembly, true).GetType(data.nameSpace, data.name, true);
+                HAX_LOG_DEBUG("[PRETYPE] {}.{} {}", data.nameSpace, data.name, (void*)data.type.m_Type);
+            }
+        }
+    }
+
+    System::Assembly GetMscorlib()
+    {
+        static System::Assembly mscorlib = System::AppDomain::GetRootDomain().Load("mscorlib");
+        return mscorlib;
+    }
 }
 
 namespace System
 {
-    bool Object::Equals(const Object& o) const
+    Assembly AppDomain::Load(const char* name, bool doAssert)
     {
-        if (!m_ManagedPtr)
+        if (!m_Domain)
             throw NullReferenceException::New();
 
-        return m_ManagedPtr == o.m_ManagedPtr;
+        backend::Assembly* assembly = backend::Assembly::Load(name);
+        backend::Image* image = assembly ? backend::Assembly::GetImage(assembly) : nullptr;
+        if (doAssert)
+            HAX_ASSERT_E(image, "Assembly {} not found", name);
+        return Assembly(image);
     }
 
-    Type Object::GetType() const
+    Type Assembly::GetType(const char* nameSpace, const char* name, bool doAssert)
     {
-        if (!m_ManagedPtr)
+        if (!m_Image)
             throw NullReferenceException::New();
 
-        if (HaxSdk::IsMono())
-            return Type(Mono::ObjectGetType(m_MonoObj));
+        auto klass = backend::Class::FromName(m_Image, nameSpace, name);
+        if (doAssert)
+            HAX_ASSERT_E(klass, "Type {}.{} not found", nameSpace, name);
         
-        return Type(Il2Cpp::ObjectGetType(m_Il2CppObj));
+        if (klass)
+        {
+            auto type = backend::Class::GetType(klass);
+            auto refType = backend::Reflection::TypeGetObject(type);
+            g_TypeToClass[refType] = klass;
+            return Type(refType);
+        }
+        return Type(nullptr);
     }
 
-    Object Object::Box(Type type, void* value)
-    {
-        return HaxSdk::IsMono() ? Object(Mono::BoxValue(type.m_MonoType, value)) : Object(Il2Cpp::BoxValue(type.m_Il2CppType, value));
-    }
-
-    void* Object::Unbox() const
+    Type Object::GetType()
     {
         if (!m_ManagedPtr)
             throw NullReferenceException::New();
 
-        if (HaxSdk::IsMono())
-            return Mono::Unbox(m_MonoObj);
-        
-        return Il2Cpp::Unbox(m_Il2CppObj);
+        return Type(backend::Object::GetType(m_Object));
     }
 
-    Object Type::CreateInstance()
+    uint32_t GCHandle::GetTargetHandle(const Object& obj, GCHandleType type)
     {
-        if (IsNull())
-            throw System::NullReferenceException::New();
+        if (!obj.m_Object)
+            return 0;
+        return type == GCHandleType::Normal
+            ? backend::GCHandle::New(obj.m_Object, false)
+            : backend::GCHandle::NewWeakRef(obj.m_Object, false);
+    }
 
-        return HaxSdk::IsMono() ? Object(Mono::NewObject(m_MonoType)) : Object(Il2Cpp::NewObject(m_Il2CppType));
+    void GCHandle::Free()
+    {
+        if (m_Handle)
+        {
+            backend::GCHandle::Free(m_Handle);
+            m_Handle = 0;
+        }
+    }
+
+    const char* Exception::GetMessage()
+    {
+        if (!m_ManagedPtr)
+            throw NullReferenceException::New();
+
+        return backend::Exception::GetMessage(m_Exception);
+    }
+
+    NullReferenceException NullReferenceException::New()
+    {
+        return NullReferenceException(backend::Exception::GetNullReferenceException());
+    }
+
+    ArgumentOutOfRangeException ArgumentOutOfRangeException::New()
+    {
+        return ArgumentOutOfRangeException(backend::Exception::GetArgumentOutOfRangeException());
+    }
+
+    FieldInfo::FieldInfo(const char* assembly, const char* nameSpace, const char* klass, const char* name) : m_Field(nullptr)
+    {
+        if (!g_Initialized)
+            g_PreInitFields.emplace_back(*this, assembly, nameSpace, klass, name);
+    }
+
+    MethodInfo::MethodInfo(const char* assembly, const char* nameSpace, const char* klass, const char* name, const char* signature)
+    {
+        if (!g_Initialized)
+            g_PreInitMethods.emplace_back(*this, assembly, nameSpace, klass, name, signature);
+    }
+
+    Type::Type(const char* assembly, const char* nameSpace, const char* name) : Object(nullptr)
+    {
+        if (!g_Initialized)
+            g_PreInitTypes.emplace_back(*this, assembly, nameSpace, name);
     }
 
     FieldInfo Type::GetField(const char* name, bool doAssert)
     {
         if (!m_ManagedPtr)
-            throw System::NullReferenceException::New();
+            throw NullReferenceException::New();
 
-        FieldInfo field = nullptr;
-        if (HaxSdk::IsMono())
-            field.m_MonoClassField = Mono::GetField(m_MonoType, name);
-        else
-            field.m_Il2CppFieldInfo = Il2Cpp::GetField(m_Il2CppType, name);
-        
+        auto field = backend::Class::GetFieldFromName(g_TypeToClass[m_Type], name);
         if (doAssert)
-            HAX_ASSERT(field.m_NativePtr, std::format("Field {} not found", name));
-
-        return field;
+            HAX_ASSERT_E(field, "Field {} not found", name);
+        return FieldInfo(field);
     }
 
-    MethodInfo Type::GetMethod(const char* name, const char* sig, bool doAssert)
+    MethodInfo Type::GetMethod(const char* name, const char* signature, bool doAssert)
     {
         if (!m_ManagedPtr)
-            throw System::NullReferenceException::New();
+            throw NullReferenceException::New();
 
-        MethodInfo method = nullptr;
-        if (HaxSdk::IsMono())
-            method.m_MonoMethod = Mono::GetMethod(m_MonoType, name, sig);
-        else
-            method.m_Il2CppMethodInfo = Il2Cpp::GetMethod(m_Il2CppType, name, sig);
-
+        auto method = backend::Class::GetMethodFromName(g_TypeToClass[m_Type], name, signature);
         if (doAssert)
-            HAX_ASSERT(method.m_NativePtr, std::format("Method {} not found", name));
-        return method;
-    }
-
-    Type String::TypeOf()
-    {
-        return Assembly::GetMscorlib().GetType("System", "String", true);
-    }
-
-    String String::New(const char* text)
-    {
-        return String(HaxSdk::IsMono() ? String(Mono::NewString(text)) : String(Il2Cpp::NewString(text)));
-    }
-
-    String String::Concat(const String& s1, const String& s2)
-    {
-        static HaxMethod method = TypeOf().GetMethod("Concat", "System.String(System.String,System.String");
-
-        if (HaxSdk::IsMono())
-        {
-            if (method.m_Thunk)
-                return method.Thunk<String, String, String>(s1, s2);
-            return method.InvokeStatic<String, String, String>(s1, s2);
-        }
-
-        return method.Address<String, String, String>(s1, s2);
-    }
-
-    Int32 String::CompareTo(const String& s)
-    {
-        static HaxMethod method = TypeOf().GetMethod("CompareTo", "System.Int32(System.String)");
-
-        if (!m_ManagedPtr)
-            throw NullReferenceException::New();
-
-        if (HaxSdk::IsMono())
-        {
-            if (method.m_Thunk)
-                return method.Thunk<Int32, void*, void*>(m_ManagedPtr, s.m_ManagedPtr);
-            return method.Invoke<Int32, void*, void*>(m_ManagedPtr, s.m_ManagedPtr);
-        }
-
-        return method.Address<Int32, void*, void*>(m_ManagedPtr, s.m_ManagedPtr);
-    }
-
-    wchar_t* String::GetRawStringData()
-    {
-        if (!m_ManagedPtr)
-            throw NullReferenceException::New();
-
-        return HaxSdk::IsMono() ? Mono::StringGetChars(m_MonoStr) : Il2Cpp::StringGetChars(m_Il2cppStr);
-    }
-
-    Int32 String::Length()
-    {
-        if (!m_ManagedPtr)
-            throw NullReferenceException::New();
-
-        return HaxSdk::IsMono() ? Mono::StringGetLength(m_MonoStr) : Il2Cpp::StringGetLength(m_Il2cppStr);
-    }
-
-    AppDomain AppDomain::GetDefaultDomain()
-    {
-        if (HaxSdk::IsMono())
-            return AppDomain(Mono::GetDomain());
-
-        return AppDomain(Il2Cpp::GetDomain());
-    }
-
-    Assembly AppDomain::Load(const char* name, bool doAssert)
-    {
-        if (!m_NativePtr)
-            throw System::NullReferenceException::New();
-
-        Assembly assembly(nullptr);
-        if (HaxSdk::IsMono())
-            assembly.m_MonoImage = Mono::LoadAssembly(m_MonoDomain, name);
-        else
-            assembly.m_Il2CppImage = Il2Cpp::LoadAssembly(m_Il2CppDomain, name);
-
-        if (doAssert)
-            HAX_ASSERT(assembly.m_NativePtr, std::format("Assembly {} not found", name));
-        return assembly;
-    }
-
-    Assembly Assembly::GetMscorlib()
-    {
-        static Assembly cached(nullptr);
-
-        if (!cached)
-        {
-            cached.m_NativePtr = HaxSdk::IsMono() 
-                ? (void*)Mono::GetCoreLib() 
-                : (void*)Il2Cpp::GetCoreLib();
-        }
-
-        return cached;
-    }
-
-    Assembly Assembly::GetUnityCoreLib()
-    {
-
-        static Assembly cached(nullptr);
-
-        if (!cached)
-        {
-            cached.m_NativePtr = HaxSdk::IsMono()
-                ? (void*)Mono::GetUnityCoreLib()
-                : (void*)Il2Cpp::GetUnityCoreLib();
-        }
-
-        return cached;
-    }
-
-    AssemblyName Assembly::GetName()
-    {
-        if (!m_NativePtr)
-            throw System::NullReferenceException::New();
-
-        if (HaxSdk::IsMono())
-            return AssemblyName(Mono::AssemblyGetName(m_MonoImage));
-
-        return AssemblyName(Il2Cpp::AssemblyGetName(m_Il2CppImage));
-    }
-
-    Type Assembly::GetType(const char* nameSpace, const char* name, bool doAssert)
-    {
-        if (!m_NativePtr)
-            throw System::NullReferenceException::New();
-
-        Type type(nullptr);
-        if (HaxSdk::IsMono())
-            type.m_MonoType = Mono::AssemblyGetType(m_MonoImage, nameSpace, name);
-        else
-            type.m_Il2CppType = Il2Cpp::AssemblyGetType(m_Il2CppImage, nameSpace, name);
-
-        if (doAssert)
-            HAX_ASSERT(type.m_ManagedPtr, std::format("Class {}.{} not found", nameSpace, name));
-        return type;
-    }
-
-    const char* AssemblyName::GetName()
-    {
-        if (!m_NativePtr)
-            throw System::NullReferenceException::New();
-
-        if (HaxSdk::IsMono())
-            return Mono::AssemblyNameGetName(m_MonoAssemblyName);
-
-        return Il2Cpp::AssemblyNameGetName(m_Il2CppAssemblyName);
-    }
-
-    int32_t FieldInfo::GetFieldOffset()
-    {
-        if (!m_NativePtr)
-            throw System::NullReferenceException::New();
-
-        if (HaxSdk::IsMono())
-            Mono::GetFieldOffset(m_MonoClassField);
-
-        return Il2Cpp::GetFieldOffset(m_Il2CppFieldInfo);
-    }
-
-    void* FieldInfo::GetStaticAddress()
-    {
-        if (!m_NativePtr)
-            throw System::NullReferenceException::New();
-
-        if (HaxSdk::IsMono())
-            return Mono::GetStaticFieldAddress(m_MonoClassField);
-
-        return Il2Cpp::GetStaticFieldAddress(m_Il2CppFieldInfo);
-    }
-
-    void FieldInfo::GetStaticValue(void* value)
-    {
-        if (!m_NativePtr)
-            throw System::NullReferenceException::New();
-
-        if (HaxSdk::IsMono())
-            return Mono::GetStaticValue(m_MonoClassField, value);
-
-        return Il2Cpp::GetStaticValue(m_Il2CppFieldInfo, value);
-    }
-
-    Object MethodInfo::Invoke(void* __this, void** args)
-    {
-        if (!m_NativePtr)
-            throw System::NullReferenceException::New();
-
-        if (HaxSdk::IsMono())
-        {
-            MonoException* ex = nullptr;
-            MonoObject* res = Mono::Invoke(m_MonoMethod, __this, args, &ex);
-            if (ex)
-                throw System::Exception(ex);
-            return Object(res);
-        }
-
-        Il2CppException* ex = nullptr;
-        Il2CppObject* res = Il2Cpp::Invoke(m_Il2CppMethodInfo, __this, args, &ex);
-        if (ex)
-            throw System::Exception(ex);
-        return Object(res);
-    }
-
-    void* MethodInfo::GetUnmanagedThunk() const
-    {
-        return HaxSdk::IsMono() ? Mono::GetUnmanagedThunk(m_MonoMethod) : nullptr;
-    }
-
-    void* MethodInfo::GetFunctionPointer() const
-    {
-        return HaxSdk::IsMono() ? Mono::GetFunctionPointer(m_MonoMethod) : Il2Cpp::GetFunctionPointer(m_Il2CppMethodInfo);
-    }
-
-    // Exceptions
-    const char* Exception::GetMessageText() const
-    {
-        if (!m_ManagedPtr)
-            throw NullReferenceException::New();
-
-        if (HaxSdk::IsMono())
-            return Mono::ExceptionGetMessage(m_MonoEx);
-
-        return Il2Cpp::ExceptionGetMessage(m_Il2CppEx);
-    }
-
-    const char* Exception::GetStackTrace() const
-    {
-        if (!m_ManagedPtr)
-            throw NullReferenceException::New();
-
-        if (HaxSdk::IsMono())
-            return  Mono::ExceptionGetStacktrace(m_MonoEx);
-
-        return Il2Cpp::ExceptionGetStacktrace(m_Il2CppEx);
-    }
-
-    NullReferenceException NullReferenceException::New()
-    {
-        if (HaxSdk::IsMono())
-            return NullReferenceException(Mono::NewObject(TypeOf().m_MonoType));
-
-        return NullReferenceException(Il2Cpp::NewObject(TypeOf().m_Il2CppType));
-    }
-
-    ArgumentOutOfRangeException ArgumentOutOfRangeException::New()
-    {
-        if (HaxSdk::IsMono())
-            return ArgumentOutOfRangeException(Mono::NewObject(TypeOf().m_MonoType));
-
-        return ArgumentOutOfRangeException(Il2Cpp::NewObject(TypeOf().m_Il2CppType));
+            HAX_ASSERT_E(method, "Method {} not found", name);
+        return MethodInfo(method);
     }
 }

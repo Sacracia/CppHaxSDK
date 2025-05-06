@@ -12,6 +12,24 @@ static System::FieldInfo EnemyDirector__enemiesSpawned("Assembly-CSharp", "", "E
 static System::FieldInfo EnemyParent__Enemy("Assembly-CSharp", "", "EnemyParent", "Enemy");
 static System::FieldInfo Aim_State__Default("Assembly-CSharp", "", "Aim/State", "Grab");
 
+struct NativeObject
+{
+    NativeObject() = default;
+
+    void* ptr1;
+    void* ptr2;
+};
+
+static NativeObject Vector3_NativeObject;
+
+struct Vector3_Boxed
+{
+    Vector3_Boxed(const Unity::Vector3& v1) : v(v1), obj(Vector3_NativeObject) {}
+
+    NativeObject obj;
+    Unity::Vector3 v;
+};
+
 struct RunManager : System::Object
 {
     static RunManager instance()
@@ -83,9 +101,13 @@ static void DrawEsp()
         for (auto& enemyParent : enemyDirector.enemiesSpawned())
         {
             Unity::Vector3 v = enemyParent.enemy().GetTransform().GetPosition();
-            Unity::Vector3 screenPos = camera.WorldToScreenPoint(v);
-            if (screenPos.z > 0.f)
-                ImGui::GetBackgroundDrawList()->AddText(ImVec2(screenPos.x, Unity::Screen::GetHeight() - screenPos.y), 0xFFFF0000, "Enemy");
+            //Vector3_Boxed boxed(v);
+            MonoException* ex = nullptr;
+            Vector3_Boxed& screenPos = ((Vector3_Boxed&(__stdcall*)(Unity::Camera, const Vector3_Boxed&, MonoException**))Camera__WorldToScreenPoint.m_Thunk)(camera, Vector3_Boxed(v), &ex);
+
+            //Unity::Vector3 screenPos = camera.WorldToScreenPoint(v);
+            if (screenPos.v.z > 0.f)
+                ImGui::GetBackgroundDrawList()->AddText(ImVec2(screenPos.v.x, Unity::Screen::GetHeight() - screenPos.v.y), 0xFFFF0000, "Enemy");
         }
     }
 }
@@ -94,7 +116,11 @@ namespace RepoCheat
 {
     void Start()
     {
-        printf("START\n");
+        Unity::Vector3 v; v.x = 1.f; v.y = 2.f; v.z = 3.f;
+        Vector3_NativeObject = *(NativeObject*)System::Object::Box(typeof<Unity::Vector3>(), &v).m_ManagedPtr;
+
+        //printf("%p %p\n", Vector3_NativeObject.ptr1, Vector3_NativeObject.ptr2);
+
         HaxSdk::AddMenuRender(RenderMenu);
         HaxSdk::AddBackgroundWork(DrawEsp);
     }

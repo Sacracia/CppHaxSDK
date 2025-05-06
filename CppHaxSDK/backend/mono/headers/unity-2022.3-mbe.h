@@ -11,7 +11,7 @@ struct MonoException {
 	MonoString *help_link;
 	/* Stores the IPs and the generic sharing infos
 	   (vtable/MRGCTX) of the frames. */
-	MonoArray<void*>  *trace_ips;
+	MonoArray*  *trace_ips;
 	MonoString *stack_trace;
 	MonoString *remote_stack_trace;
 	int32_t	    remote_stack_index;
@@ -21,7 +21,7 @@ struct MonoException {
 	MonoString *source;
 	MonoObject *serialization_manager;
 	MonoObject *captured_traces;
-	MonoArray<void*>  *native_trace_ips;
+	MonoArray*  *native_trace_ips;
 	int32_t caught_in_unmanaged;
 };
 
