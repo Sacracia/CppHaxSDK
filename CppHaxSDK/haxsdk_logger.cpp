@@ -11,10 +11,6 @@ struct HaxLogger
 {
     void Initialize(bool useConsole);
     void Log(std::string_view message, std::string_view tag, WORD textAttrs);
-    /*void LogInfo(std::string_view message) { Log(message, "INFO", 15); }
-    void LogDebug(std::string_view message) { Log(message, "DEBUG", 8); }
-    void LogWarning(std::string_view message) { Log(message, "WARNING", 14); }
-    void LogError(std::string_view message) { Log(message, "ERROR", 12); }*/
 
 private:
     bool m_Initialized;

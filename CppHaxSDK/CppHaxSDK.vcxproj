@@ -159,14 +159,14 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>UNITY_2022_3</PreprocessorDefinitions>
+      <PreprocessorDefinitions>UNITY_2022_3; NET_4_0</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>
-      </AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(VULKAN_SDK)\Include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
+      <Optimization>MaxSpeed</Optimization>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -176,10 +176,11 @@
       <EnableUAC>false</EnableUAC>
       <AdditionalDependencies>
       </AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x64</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)CppHaxSDK\third_party\detours\x64;$(VULKAN_SDK)\Lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="backend\haxsdk_backend.h" />
     <ClInclude Include="haxsdk_assertion.h" />
     <ClInclude Include="backend\il2cpp\haxsdk_il2cpp.h" />
     <ClInclude Include="backend\mono\headers\unity-2017.1.h" />
@@ -198,8 +199,6 @@
     <ClInclude Include="haxsdk_gui.h" />
     <ClInclude Include="haxsdk_logger.h" />
     <ClInclude Include="backend\mono\haxsdk_mono.h" />
-    <ClInclude Include="backend\haxsdk_backend.h" />
-    <ClInclude Include="haxsdk_system.h" />
     <ClInclude Include="haxsdk_tools.h" />
     <ClInclude Include="mono\mono.h" />
     <ClInclude Include="mono\mono_api_classes.h" />
@@ -208,6 +207,7 @@
     <ClInclude Include="mono\mono_game_functions.h" />
     <ClInclude Include="mono\mono_game_offsets.h" />
     <ClInclude Include="mono\mono_game_static_fields.h" />
+    <ClInclude Include="system\haxsdk_system.h" />
     <ClInclude Include="third_party\detours\x64\detours.h" />
     <ClInclude Include="third_party\detours\x64\detver.h" />
     <ClInclude Include="third_party\detours\x64\syelog.h" />
@@ -221,6 +221,7 @@
     <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl2.h" />
     <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl3.h" />
     <ClInclude Include="third_party\imgui\backend\imgui_impl_opengl3_loader.h" />
+    <ClInclude Include="third_party\imgui\backend\imgui_impl_vulkan.h" />
     <ClInclude Include="third_party\imgui\backend\imgui_impl_win32.h" />
     <ClInclude Include="third_party\imgui\imconfig.h" />
     <ClInclude Include="third_party\imgui\imgui.h" />
@@ -229,6 +230,7 @@
     <ClInclude Include="third_party\imgui\imstb_textedit.h" />
     <ClInclude Include="third_party\imgui\imstb_truetype.h" />
     <ClInclude Include="third_party\stb_image.h" />
+    <ClInclude Include="unity\haxsdk_unity.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="backend\haxsdk_backend.cpp" />
@@ -238,20 +240,26 @@
     <ClCompile Include="haxsdk_assertion.cpp" />
     <ClCompile Include="haxsdk_gui.cpp" />
     <ClCompile Include="haxsdk_logger.cpp" />
-    <ClCompile Include="haxsdk_system.cpp" />
     <ClCompile Include="haxsdk_tools.cpp" />
+    <ClCompile Include="system\haxsdk_system.cpp" />
+    <ClCompile Include="system\String.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx10.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx11.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx12.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_dx9.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_opengl2.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="third_party\imgui\backend\imgui_impl_vulkan.cpp" />
     <ClCompile Include="third_party\imgui\backend\imgui_impl_win32.cpp" />
     <ClCompile Include="third_party\imgui\imgui.cpp" />
     <ClCompile Include="third_party\imgui\imgui_demo.cpp" />
     <ClCompile Include="third_party\imgui\imgui_draw.cpp" />
     <ClCompile Include="third_party\imgui\imgui_tables.cpp" />
     <ClCompile Include="third_party\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="unity\haxsdk_unity.cpp" />
+    <ClCompile Include="unity\object.cpp" />
+    <ClCompile Include="unity\component.cpp" />
+    <ClCompile Include="unity\transform.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="third_party\detours\x64\detours.lib" />

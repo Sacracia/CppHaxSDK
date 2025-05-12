@@ -25,10 +25,13 @@
 #include <d3d11.h>
 #pragma comment(lib, "d3d11.lib")
 
-
 // directx 12
 #include <d3d12.h>
 #pragma comment(lib, "d3d12.lib")
+
+// vulkan
+#include <vulkan/vulkan.h>
+#pragma comment(lib, "vulkan-1.lib")
 
 #ifdef _WIN64
     #if __has_include("third_party/detours/x64/detours.h")
@@ -54,6 +57,7 @@
 #include "third_party/imgui/backend/imgui_impl_dx10.h"
 #include "third_party/imgui/backend/imgui_impl_dx11.h"
 #include "third_party/imgui/backend/imgui_impl_dx12.h"
+#include "third_party/imgui/backend/imgui_impl_vulkan.h"
 #include "third_party/imgui/backend/imgui_impl_win32.h"
 #include "third_party/imgui/backend/imgui_impl_opengl3.h"
 #include "third_party/imgui/backend/imgui_impl_opengl3_loader.h"
@@ -61,7 +65,7 @@
 #include "third_party/stb_image.h"
 
 //#include "haxsdk.h"
-#include "haxsdk_system.h"
+#include "system/haxsdk_system.h"
 #include "haxsdk_logger.h"
 
 using setCursorPos_t            = BOOL(WINAPI*)(int, int);
@@ -71,6 +75,10 @@ using mouse_event_t             = void(WINAPI*)(DWORD, DWORD, DWORD, DWORD, ULON
 using GetCursorPos_t            = BOOL(WINAPI*)(LPPOINT);
 using SendInput_t               = UINT(WINAPI*)(UINT, LPINPUT, int);
 using SendMessageW_t            = LRESULT(WINAPI*)(HWND, UINT, WPARAM, LPARAM);
+using vkAcquireNextImageKHR_t   = VkResult(VKAPI_CALL*)(VkDevice, VkSwapchainKHR, uint64_t, VkSemaphore, VkFence, uint32_t*);
+using vkAcquireNextImage2KHR_t  = VkResult(VKAPI_CALL*)(VkDevice, const VkAcquireNextImageInfoKHR*, uint32_t*);
+using vkQueuePresentKHR_t       = VkResult(VKAPI_CALL*)(VkQueue, const VkPresentInfoKHR*);
+using vkCreateSwapchainKHR_t    = VkResult(VKAPI_CALL*)(VkDevice, const VkSwapchainCreateInfoKHR*, const VkAllocationCallbacks*, VkSwapchainKHR*);
 
 using swapBuffers_t             = bool(WINAPI*)(HDC);
 using reset_t                   = HRESULT(WINAPI*)(LPDIRECT3DDEVICE9, D3DPRESENT_PARAMETERS*);
@@ -95,8 +103,13 @@ static SendMessageW_t                   oSendMessageW;
 static swapBuffers_t                    oSwapBuffers;
 static present_t                        oPresent;
 static resizeBuffers_t                  oResizeBuffers;
+static vkAcquireNextImageKHR_t          oVkAcquireNextImageKHR;
+static vkAcquireNextImage2KHR_t         oVkAcquireNextImage2KHR;
+static vkQueuePresentKHR_t              oVkQueuePresentKHR;
+static vkCreateSwapchainKHR_t           oVkCreateSwapchainKHR;
 static bool                             g_MenuVisible = true;
 static int                              g_MenuHotkey = 0xC0;
+static HWND                             g_GameHwnd;
 static HANDLE                           g_CheatHandle;
 static std::function<void()>            g_FnMenuRender;
 static std::function<void()>            g_FnBackground;
@@ -132,6 +145,24 @@ namespace dx12 {
     static ID3D12Resource*              g_mainRenderTargetResource[NUM_BACK_BUFFERS] = { };
     static D3D12_CPU_DESCRIPTOR_HANDLE  g_mainRenderTargetDescriptor[NUM_BACK_BUFFERS] = { };
     static executeCommandLists_t        oExecuteCommandLists;
+}
+namespace vulkan
+{
+    static VkAllocationCallbacks* g_Allocator = NULL;
+    static VkInstance g_Instance = VK_NULL_HANDLE;
+    static VkPhysicalDevice g_PhysicalDevice = VK_NULL_HANDLE;
+    static VkDevice g_FakeDevice = VK_NULL_HANDLE, g_Device = VK_NULL_HANDLE;
+
+    static uint32_t g_QueueFamily = (uint32_t)-1;
+    static std::vector<VkQueueFamilyProperties> g_QueueFamilies;
+
+    static VkPipelineCache g_PipelineCache = VK_NULL_HANDLE;
+    static VkDescriptorPool g_DescriptorPool = VK_NULL_HANDLE;
+    static uint32_t g_MinImageCount = 2;
+    static VkRenderPass g_RenderPass = VK_NULL_HANDLE;
+    static ImGui_ImplVulkanH_Frame g_Frames[8] = { };
+    static ImGui_ImplVulkanH_FrameSemaphores g_FrameSemaphores[8] = { };
+    static VkExtent2D g_ImageExtent = {};
 }
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -186,12 +217,40 @@ namespace dx12 {
                                                             UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
     static void WINAPI                  HookedExecuteCommandLists(ID3D12CommandQueue* pCommandQueue, UINT NumCommandLists, ID3D12CommandList* ppCommandLists);
 }
+namespace vulkan
+{
+    static void                         Setup();
+    static bool                         CreateDevice();
+    static void                         CleanupRenderTarget();
+    static void                         CreateRenderTarget(VkDevice device, VkSwapchainKHR swapchain);
+    static bool                         DoesQueueSupportGraphic(VkQueue queue, VkQueue* pGraphicQueue);
+    static void                         RenderImGui_Vulkan(VkQueue queue, const VkPresentInfoKHR* pPresentInfo);
+}
 
 void HaxSdk::ImplementImGui(GraphicsApi graphics, std::function<void()> fnInit, std::function<void()> fnBackground, std::function<void()> fnRender) {
     g_graphicsApi = graphics;
     g_FnInitialize = fnInit;
     g_FnBackground = fnBackground;
     g_FnMenuRender = fnRender;
+
+    WNDENUMPROC enumProc = [](HWND hwnd, LPARAM lParam) -> BOOL
+    {
+        DWORD pid;
+        GetWindowThreadProcessId(hwnd, &pid);
+        
+        if (pid != GetCurrentProcessId())
+            return TRUE;
+
+        wchar_t buff[64]{0};
+        GetClassNameW(hwnd, buff, sizeof(buff) / sizeof(wchar_t));
+        if (wcscmp(buff, L"UnityWndClass") == 0)
+        {
+            g_GameHwnd = hwnd;
+            return FALSE;
+        }
+        return TRUE;
+    };
+    EnumWindows(enumProc, 0);
 
     WNDCLASSEX dummyWindow{};
     dummyWindow.cbSize = 0;
@@ -239,7 +298,7 @@ void HaxSdk::ImplementImGui(GraphicsApi graphics, std::function<void()> fnInit, 
                 dx12::Setup();
             }
             if (moduleName == "vulkan-1.dll" && (g_graphicsApi & GraphicsApi_Vulkan)) {
-                HAX_LOG("VULKAN graphics api found");
+                vulkan::Setup();
             }
         } while (Module32Next(snapshot, &me));
     }
@@ -253,7 +312,7 @@ void HaxSdk::ImplementImGui(GraphicsApi graphics, std::function<void()> fnInit, 
     if (oPresent) {
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
-        ::DetourAttach(&(PVOID&)oPresent, HookedPresent);
+        DetourAttach(&(PVOID&)oPresent, HookedPresent);
         DetourTransactionCommit();
     }
 }
@@ -336,49 +395,53 @@ static LRESULT WINAPI HookedPresent(IDXGISwapChain* pSwapChain, UINT syncInterva
 }
 
 static void InitImGuiContext(const ImGuiContextParams& params) {
-    HWND hwnd = 0;
+    //HWND hwnd = 0;
     if (params.graphicsApi & GraphicsApi_OpenGL) {
-        hwnd = WindowFromDC(params.hdc);
+        //hwnd = WindowFromDC(params.hdc);
         ImGui::CreateContext();
-        ImGui_ImplWin32_Init(hwnd);
+        ImGui_ImplWin32_Init(g_GameHwnd);
         ImGui_ImplOpenGL3_Init();
     }
     if (params.graphicsApi & GraphicsApi_DirectX9) {
         D3DDEVICE_CREATION_PARAMETERS creationParams;
         params.pDevice9->GetCreationParameters(&creationParams);
-        hwnd = creationParams.hFocusWindow;
+        //hwnd = creationParams.hFocusWindow;
         ImGui::CreateContext();
-        ImGui_ImplWin32_Init(hwnd);
+        ImGui_ImplWin32_Init(g_GameHwnd);
         ImGui_ImplDX9_Init(params.pDevice9);
     }
     if (params.graphicsApi & GraphicsApi_DirectX10) {
-        DXGI_SWAP_CHAIN_DESC swapChainDesc;
+        /*DXGI_SWAP_CHAIN_DESC swapChainDesc;
         params.pSwapChain->GetDevice(IID_PPV_ARGS(&dx10::g_pDevice));
         params.pSwapChain->GetDesc(&swapChainDesc);
-        hwnd = swapChainDesc.OutputWindow;
+        hwnd = swapChainDesc.OutputWindow;*/
         ImGui::CreateContext();
-        ImGui_ImplWin32_Init(hwnd);
+        ImGui_ImplWin32_Init(g_GameHwnd);
         ImGui_ImplDX10_Init(dx10::g_pDevice);
     }
     if (params.graphicsApi & GraphicsApi_DirectX11) {
-        DXGI_SWAP_CHAIN_DESC swapChainDesc;
+        //DXGI_SWAP_CHAIN_DESC swapChainDesc;
         params.pSwapChain->GetDevice(IID_PPV_ARGS(&dx11::g_pDevice));
-        params.pSwapChain->GetDesc(&swapChainDesc);
+        //params.pSwapChain->GetDesc(&swapChainDesc);
         dx11::g_pDevice->GetImmediateContext(&dx11::g_pDeviceContext);
-        hwnd = swapChainDesc.OutputWindow;
+        //hwnd = swapChainDesc.OutputWindow;
         ImGui::CreateContext();
-        ImGui_ImplWin32_Init(hwnd);
+        ImGui_ImplWin32_Init(g_GameHwnd);
         ImGui_ImplDX11_Init(dx11::g_pDevice, dx11::g_pDeviceContext);
     }
     if (params.graphicsApi & GraphicsApi_DirectX12) {
-        DXGI_SWAP_CHAIN_DESC swapChainDesc;
+        /*DXGI_SWAP_CHAIN_DESC swapChainDesc;
         params.pSwapChain->GetDesc(&swapChainDesc);
-        hwnd = swapChainDesc.OutputWindow;
+        hwnd = swapChainDesc.OutputWindow;*/
         ImGui::CreateContext();
-        ImGui_ImplWin32_Init(hwnd);
+        ImGui_ImplWin32_Init(g_GameHwnd);
     }
-    //HaxSdk::GetGlobals().m_GameHWND = hwnd;
-    HaxSdk::AttachThread();
+    if (params.graphicsApi & GraphicsApi_Vulkan)
+    {
+        ImGui::CreateContext();
+        ImGui_ImplWin32_Init(g_GameHwnd);
+    }
+    unsafe::Thread::Attach();
 
     ImGui::GetIO().IniFilename = nullptr;
     if (g_FnInitialize)
@@ -387,7 +450,7 @@ static void InitImGuiContext(const ImGuiContextParams& params) {
     ImGuiIO& io = ImGui::GetIO();
     io.WantCaptureMouse = true;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableSetMousePos;
-    oWndproc = (WNDPROC)SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
+    oWndproc = (WNDPROC)SetWindowLongPtr(g_GameHwnd, GWLP_WNDPROC, (LONG_PTR)HookedWndproc);
 
     DetourTransactionBegin();
     DetourUpdateThread(GetCurrentThread());
@@ -528,7 +591,7 @@ namespace opengl {
         HAX_LOG_DEBUG("[OPENGL] wglSwapBuffers address is {}", (void*)oSwapBuffers);
         DetourTransactionBegin();
         DetourUpdateThread(GetCurrentThread());
-        ::DetourAttach(&(PVOID&)oSwapBuffers, HookedSwapBuffers);
+        DetourAttach(&(PVOID&)oSwapBuffers, HookedSwapBuffers);
         DetourTransactionCommit();
     }
 
@@ -553,7 +616,8 @@ namespace opengl {
         }
         catch (System::Exception& ex)
         {
-            HaxSdk::LogError(ex.GetMessage());
+            System::String message = ex.GetMessage();
+            HaxSdk::LogError(message ? message.UTF8() : "Exception without message");
         }
 
         ImGui::Render();
@@ -662,7 +726,8 @@ namespace dx9 {
         }
         catch (System::Exception& ex)
         {
-            HaxSdk::LogError(ex.GetMessage());
+            System::String message = ex.GetMessage();
+            HaxSdk::LogError(message ? message.UTF8() : "Exception without message");
         }
 
         ImGui::EndFrame();
@@ -742,7 +807,8 @@ namespace dx10 {
         }
         catch (System::Exception& ex)
         {
-            HaxSdk::LogError(ex.GetMessage());
+            System::String message = ex.GetMessage();
+            HaxSdk::LogError(message ? message.UTF8() : "Exception without message");
         }
 
         ImGui::EndFrame();
@@ -781,7 +847,7 @@ namespace dx11 {
 
         HMODULE module = GetModuleHandle("d3d11.dll");
 
-        DXGI_SWAP_CHAIN_DESC swapChainDesc = { };
+        DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
         swapChainDesc.Windowed = TRUE;
         swapChainDesc.BufferCount = 2;
         swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -851,7 +917,8 @@ namespace dx11 {
         }
         catch (System::Exception& ex)
         {
-            HaxSdk::LogError(ex.GetMessage());
+            System::String message = ex.GetMessage();
+            HaxSdk::LogError(message ? message.UTF8() : "Exception without message");
         }
 
         ImGui::EndFrame();
@@ -1079,7 +1146,8 @@ namespace dx12 {
             }
             catch (System::Exception& ex)
             {
-                HaxSdk::LogError(ex.GetMessage());
+                System::String message = ex.GetMessage();
+                HaxSdk::LogError(message ? message.UTF8() : "Exception without message");
             }
 
             ImGui::Render();
@@ -1141,3 +1209,512 @@ namespace dx12 {
         }
     }
 } // dx12
+namespace vulkan
+{
+    static VkResult VKAPI_CALL HookedVkAcquireNextImageKHR(VkDevice device,
+                                                    VkSwapchainKHR swapchain,
+                                                    uint64_t timeout,
+                                                    VkSemaphore semaphore,
+                                                    VkFence fence,
+                                                    uint32_t* pImageIndex) 
+    {
+        g_Device = device;
+
+        return oVkAcquireNextImageKHR(device, swapchain, timeout, semaphore, fence, pImageIndex);
+    }
+
+    static VkResult VKAPI_CALL HookedVkAcquireNextImage2KHR(VkDevice device,
+        const VkAcquireNextImageInfoKHR* pAcquireInfo,
+        uint32_t* pImageIndex) {
+        g_Device = device;
+
+        return oVkAcquireNextImage2KHR(device, pAcquireInfo, pImageIndex);
+    }
+
+    static VkResult VKAPI_CALL HookedVkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo) 
+    {
+        if (!ImGui::GetCurrentContext()) 
+        {
+            ImGuiContextParams params = { GraphicsApi_OpenGL, nullptr, nullptr, nullptr };
+            InitImGuiContext(params);
+            HAX_LOG("GAME USES VULKAN");
+        }
+
+        RenderImGui_Vulkan(queue, pPresentInfo);
+        return oVkQueuePresentKHR(queue, pPresentInfo);
+    }
+
+    static VkResult VKAPI_CALL HookedVkCreateSwapchainKHR(VkDevice device,
+                                                    const VkSwapchainCreateInfoKHR* pCreateInfo,
+                                                    const VkAllocationCallbacks* pAllocator,
+                                                    VkSwapchainKHR* pSwapchain) 
+    {
+        CleanupRenderTarget();
+        g_ImageExtent = pCreateInfo->imageExtent;
+
+        return oVkCreateSwapchainKHR(device, pCreateInfo, pAllocator, pSwapchain);
+    }
+
+    static void Setup()
+    {
+        if (!CreateDevice()) 
+        {
+            HaxSdk::LogError("[!] CreateDeviceVK() failed.\n");
+            return;
+        }
+            
+        oVkAcquireNextImageKHR = (vkAcquireNextImageKHR_t)vkGetDeviceProcAddr(g_FakeDevice, "vkAcquireNextImageKHR");
+        oVkAcquireNextImage2KHR = (vkAcquireNextImage2KHR_t)vkGetDeviceProcAddr(g_FakeDevice, "vkAcquireNextImage2KHR");
+        oVkQueuePresentKHR = (vkQueuePresentKHR_t)vkGetDeviceProcAddr(g_FakeDevice, "vkQueuePresentKHR");
+        oVkCreateSwapchainKHR = (vkCreateSwapchainKHR_t)vkGetDeviceProcAddr(g_FakeDevice, "vkCreateSwapchainKHR");
+
+        if (g_FakeDevice) 
+        {
+            vkDestroyDevice(g_FakeDevice, g_Allocator);
+            g_FakeDevice = NULL;
+        }
+
+        if (oVkAcquireNextImageKHR) {
+            // Hook
+            printf("[+] Vulkan: fnAcquireNextImageKHR: 0x%p\n", oVkAcquireNextImageKHR);
+            printf("[+] Vulkan: fnAcquireNextImage2KHR: 0x%p\n", oVkAcquireNextImage2KHR);
+            printf("[+] Vulkan: fnQueuePresentKHR: 0x%p\n", oVkQueuePresentKHR);
+            printf("[+] Vulkan: fnCreateSwapchainKHR: 0x%p\n", oVkCreateSwapchainKHR);
+
+            DetourTransactionBegin();
+            DetourUpdateThread(GetCurrentThread());
+            DetourAttach(&oVkAcquireNextImageKHR, HookedVkAcquireNextImageKHR);
+            DetourAttach(&oVkAcquireNextImage2KHR, HookedVkAcquireNextImage2KHR);
+            DetourAttach(&oVkQueuePresentKHR, HookedVkQueuePresentKHR);
+            DetourAttach(&oVkCreateSwapchainKHR, HookedVkCreateSwapchainKHR);
+            DetourTransactionCommit();
+        }
+    }
+
+    static void RenderImGui_Vulkan(VkQueue queue, const VkPresentInfoKHR* pPresentInfo) {
+        if (!g_Device)
+            return;
+
+        VkQueue graphicQueue = VK_NULL_HANDLE;
+        const bool queueSupportsGraphic = DoesQueueSupportGraphic(queue, &graphicQueue);
+
+
+        for (uint32_t i = 0; i < pPresentInfo->swapchainCount; ++i) {
+            VkSwapchainKHR swapchain = pPresentInfo->pSwapchains[i];
+            if (g_Frames[0].Framebuffer == VK_NULL_HANDLE) {
+                CreateRenderTarget(g_Device, swapchain);
+            }
+
+            ImGui_ImplVulkanH_Frame* fd = &g_Frames[pPresentInfo->pImageIndices[i]];
+            ImGui_ImplVulkanH_FrameSemaphores* fsd = &g_FrameSemaphores[pPresentInfo->pImageIndices[i]];
+            {
+                vkWaitForFences(g_Device, 1, &fd->Fence, VK_TRUE, ~0ull);
+                vkResetFences(g_Device, 1, &fd->Fence);
+            }
+            {
+                vkResetCommandBuffer(fd->CommandBuffer, 0);
+
+                VkCommandBufferBeginInfo info = { };
+                info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+                info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+                vkBeginCommandBuffer(fd->CommandBuffer, &info);
+            }
+            {
+                VkRenderPassBeginInfo info = { };
+                info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+                info.renderPass = g_RenderPass;
+                info.framebuffer = fd->Framebuffer;
+                if (g_ImageExtent.width == 0 || g_ImageExtent.height == 0) {
+                    // We don't know the window size the first time. So we just set it to 4K.
+                    info.renderArea.extent.width = 3840;
+                    info.renderArea.extent.height = 2160;
+                }
+                else {
+                    info.renderArea.extent = g_ImageExtent;
+                }
+
+                vkCmdBeginRenderPass(fd->CommandBuffer, &info, VK_SUBPASS_CONTENTS_INLINE);
+            }
+
+            if (!ImGui::GetIO().BackendRendererUserData) {
+                ImGui_ImplVulkan_InitInfo init_info = { };
+                init_info.Instance = g_Instance;
+                init_info.PhysicalDevice = g_PhysicalDevice;
+                init_info.Device = g_Device;
+                init_info.QueueFamily = g_QueueFamily;
+                init_info.Queue = graphicQueue;
+                init_info.PipelineCache = g_PipelineCache;
+                init_info.DescriptorPool = g_DescriptorPool;
+                init_info.Subpass = 0;
+                init_info.MinImageCount = g_MinImageCount;
+                init_info.ImageCount = g_MinImageCount;
+                init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+                init_info.Allocator = g_Allocator;
+                ImGui_ImplVulkan_Init(&init_info, g_RenderPass);
+
+                ImGui_ImplVulkan_CreateFontsTexture(fd->CommandBuffer);
+            }
+
+            ImGui_ImplVulkan_NewFrame();
+            ImGui_ImplWin32_NewFrame();
+            ImGui::NewFrame();
+
+            try
+            {
+                if (g_FnBackground)
+                    g_FnBackground();
+
+                if (g_MenuVisible && g_FnMenuRender)
+                    g_FnMenuRender();
+            }
+            catch (System::Exception& ex)
+            {
+                System::String message = ex.GetMessage();
+                HaxSdk::LogError(message ? message.UTF8() : "Exception without message");
+            }
+
+            ImGui::Render();
+
+            // Record dear imgui primitives into command buffer
+            ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), fd->CommandBuffer);
+
+            // Submit command buffer
+            vkCmdEndRenderPass(fd->CommandBuffer);
+            vkEndCommandBuffer(fd->CommandBuffer);
+
+            uint32_t waitSemaphoresCount = i == 0 ? pPresentInfo->waitSemaphoreCount : 0;
+            if (waitSemaphoresCount == 0 && !queueSupportsGraphic) {
+                constexpr VkPipelineStageFlags stages_wait = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+                {
+                    VkSubmitInfo info = { };
+                    info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+                    info.pWaitDstStageMask = &stages_wait;
+
+                    info.signalSemaphoreCount = 1;
+                    info.pSignalSemaphores = &fsd->RenderCompleteSemaphore;
+
+                    vkQueueSubmit(queue, 1, &info, VK_NULL_HANDLE);
+                }
+                {
+                    VkSubmitInfo info = { };
+                    info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+                    info.commandBufferCount = 1;
+                    info.pCommandBuffers = &fd->CommandBuffer;
+
+                    info.pWaitDstStageMask = &stages_wait;
+                    info.waitSemaphoreCount = 1;
+                    info.pWaitSemaphores = &fsd->RenderCompleteSemaphore;
+
+                    info.signalSemaphoreCount = 1;
+                    info.pSignalSemaphores = &fsd->ImageAcquiredSemaphore;
+
+                    vkQueueSubmit(graphicQueue, 1, &info, fd->Fence);
+                }
+            }
+            else {
+                std::vector<VkPipelineStageFlags> stages_wait(waitSemaphoresCount, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+                VkSubmitInfo info = { };
+                info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+                info.commandBufferCount = 1;
+                info.pCommandBuffers = &fd->CommandBuffer;
+
+                info.pWaitDstStageMask = stages_wait.data();
+                info.waitSemaphoreCount = waitSemaphoresCount;
+                info.pWaitSemaphores = pPresentInfo->pWaitSemaphores;
+
+                info.signalSemaphoreCount = 1;
+                info.pSignalSemaphores = &fsd->ImageAcquiredSemaphore;
+
+                vkQueueSubmit(graphicQueue, 1, &info, fd->Fence);
+            }
+        }
+    }
+
+    static bool CreateDevice() 
+    {
+        // Create Vulkan Instance
+        {
+            VkInstanceCreateInfo create_info = { };
+            constexpr const char* instance_extension = "VK_KHR_surface";
+
+            create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+            create_info.enabledExtensionCount = 1;
+            create_info.ppEnabledExtensionNames = &instance_extension;
+
+            // Create Vulkan Instance without any debug feature
+            vkCreateInstance(&create_info, g_Allocator, &g_Instance);
+            HAX_LOG_DEBUG("[+] Vulkan: g_Instance: 0x {}\n", (void*)g_Instance);
+        }
+
+        // Select GPU
+        {
+            uint32_t gpu_count;
+            vkEnumeratePhysicalDevices(g_Instance, &gpu_count, NULL);
+            IM_ASSERT(gpu_count > 0);
+
+            VkPhysicalDevice* gpus = new VkPhysicalDevice[sizeof(VkPhysicalDevice) * gpu_count];
+            vkEnumeratePhysicalDevices(g_Instance, &gpu_count, gpus);
+
+            // If a number >1 of GPUs got reported, find discrete GPU if present, or use first one available. This covers
+            // most common cases (multi-gpu/integrated+dedicated graphics). Handling more complicated setups (multiple
+            // dedicated GPUs) is out of scope of this sample.
+            int use_gpu = 0;
+            for (int i = 0; i < (int)gpu_count; ++i) {
+                VkPhysicalDeviceProperties properties;
+                vkGetPhysicalDeviceProperties(gpus[i], &properties);
+                if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+                    use_gpu = i;
+                    break;
+                }
+            }
+
+            g_PhysicalDevice = gpus[use_gpu];
+            HAX_LOG_DEBUG("[+] Vulkan: g_PhysicalDevice: {}\n", (void*)g_PhysicalDevice);
+
+            delete[] gpus;
+        }
+
+        // Select graphics queue family
+        {
+            uint32_t count;
+            vkGetPhysicalDeviceQueueFamilyProperties(g_PhysicalDevice, &count, NULL);
+            g_QueueFamilies.resize(count);
+            vkGetPhysicalDeviceQueueFamilyProperties(g_PhysicalDevice, &count, g_QueueFamilies.data());
+            for (uint32_t i = 0; i < count; ++i) {
+                if (g_QueueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                    g_QueueFamily = i;
+                    break;
+                }
+            }
+            IM_ASSERT(g_QueueFamily != (uint32_t)-1);
+
+            HAX_LOG_DEBUG("[+] Vulkan: g_QueueFamily: {}\n", g_QueueFamily);
+        }
+
+        // Create Logical Device (with 1 queue)
+        {
+            constexpr const char* device_extension = "VK_KHR_swapchain";
+            constexpr const float queue_priority = 1.0f;
+
+            VkDeviceQueueCreateInfo queue_info = { };
+            queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+            queue_info.queueFamilyIndex = g_QueueFamily;
+            queue_info.queueCount = 1;
+            queue_info.pQueuePriorities = &queue_priority;
+
+            VkDeviceCreateInfo create_info = { };
+            create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+            create_info.queueCreateInfoCount = 1;
+            create_info.pQueueCreateInfos = &queue_info;
+            create_info.enabledExtensionCount = 1;
+            create_info.ppEnabledExtensionNames = &device_extension;
+
+            vkCreateDevice(g_PhysicalDevice, &create_info, g_Allocator, &g_FakeDevice);
+
+            HAX_LOG_DEBUG("[+] Vulkan: g_FakeDevice: {}\n", (void*)g_FakeDevice);
+        }
+
+        return true;
+    }
+
+    static bool DoesQueueSupportGraphic(VkQueue queue, VkQueue* pGraphicQueue) {
+        for (uint32_t i = 0; i < g_QueueFamilies.size(); ++i) {
+            const VkQueueFamilyProperties& family = g_QueueFamilies[i];
+            for (uint32_t j = 0; j < family.queueCount; ++j) {
+                VkQueue it = VK_NULL_HANDLE;
+                vkGetDeviceQueue(g_Device, i, j, &it);
+
+                if (pGraphicQueue && family.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                    if (*pGraphicQueue == VK_NULL_HANDLE) {
+                        *pGraphicQueue = it;
+                    }
+                }
+
+                if (queue == it && family.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    static void CreateRenderTarget(VkDevice device, VkSwapchainKHR swapchain) {
+        uint32_t uImageCount;
+        vkGetSwapchainImagesKHR(device, swapchain, &uImageCount, NULL);
+
+        VkImage backbuffers[8] = { };
+        vkGetSwapchainImagesKHR(device, swapchain, &uImageCount, backbuffers);
+
+        for (uint32_t i = 0; i < uImageCount; ++i) {
+            g_Frames[i].Backbuffer = backbuffers[i];
+
+            ImGui_ImplVulkanH_Frame* fd = &g_Frames[i];
+            ImGui_ImplVulkanH_FrameSemaphores* fsd = &g_FrameSemaphores[i];
+            {
+                VkCommandPoolCreateInfo info = { };
+                info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+                info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+                info.queueFamilyIndex = g_QueueFamily;
+
+                vkCreateCommandPool(device, &info, g_Allocator, &fd->CommandPool);
+            }
+            {
+                VkCommandBufferAllocateInfo info = { };
+                info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+                info.commandPool = fd->CommandPool;
+                info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+                info.commandBufferCount = 1;
+
+                vkAllocateCommandBuffers(device, &info, &fd->CommandBuffer);
+            }
+            {
+                VkFenceCreateInfo info = { };
+                info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+                info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+                vkCreateFence(device, &info, g_Allocator, &fd->Fence);
+            }
+            {
+                VkSemaphoreCreateInfo info = { };
+                info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+                vkCreateSemaphore(device, &info, g_Allocator, &fsd->ImageAcquiredSemaphore);
+                vkCreateSemaphore(device, &info, g_Allocator, &fsd->RenderCompleteSemaphore);
+            }
+        }
+
+        // Create the Render Pass
+        {
+            VkAttachmentDescription attachment = { };
+            attachment.format = VK_FORMAT_B8G8R8A8_UNORM;
+            attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+            attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+            VkAttachmentReference color_attachment = { };
+            color_attachment.attachment = 0;
+            color_attachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+            VkSubpassDescription subpass = { };
+            subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+            subpass.colorAttachmentCount = 1;
+            subpass.pColorAttachments = &color_attachment;
+
+            VkRenderPassCreateInfo info = { };
+            info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+            info.attachmentCount = 1;
+            info.pAttachments = &attachment;
+            info.subpassCount = 1;
+            info.pSubpasses = &subpass;
+
+            vkCreateRenderPass(device, &info, g_Allocator, &g_RenderPass);
+        }
+
+        // Create The Image Views
+        {
+            VkImageViewCreateInfo info = { };
+            info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            info.format = VK_FORMAT_B8G8R8A8_UNORM;
+
+            info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            info.subresourceRange.baseMipLevel = 0;
+            info.subresourceRange.levelCount = 1;
+            info.subresourceRange.baseArrayLayer = 0;
+            info.subresourceRange.layerCount = 1;
+
+            for (uint32_t i = 0; i < uImageCount; ++i) {
+                ImGui_ImplVulkanH_Frame* fd = &g_Frames[i];
+                info.image = fd->Backbuffer;
+
+                vkCreateImageView(device, &info, g_Allocator, &fd->BackbufferView);
+            }
+        }
+
+        // Create Framebuffer
+        {
+            VkImageView attachment[1];
+            VkFramebufferCreateInfo info = { };
+            info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+            info.renderPass = g_RenderPass;
+            info.attachmentCount = 1;
+            info.pAttachments = attachment;
+            info.layers = 1;
+
+            for (uint32_t i = 0; i < uImageCount; ++i) {
+                ImGui_ImplVulkanH_Frame* fd = &g_Frames[i];
+                attachment[0] = fd->BackbufferView;
+
+                vkCreateFramebuffer(device, &info, g_Allocator, &fd->Framebuffer);
+            }
+        }
+
+        if (!g_DescriptorPool) // Create Descriptor Pool.
+        {
+            constexpr VkDescriptorPoolSize pool_sizes[] =
+            {
+                {VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+                {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+                {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
+                {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
+                {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
+                {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
+                {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
+                {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
+                {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+                {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+                {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000} };
+
+            VkDescriptorPoolCreateInfo pool_info = { };
+            pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+            pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+            pool_info.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
+            pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+            pool_info.pPoolSizes = pool_sizes;
+
+            vkCreateDescriptorPool(device, &pool_info, g_Allocator, &g_DescriptorPool);
+        }
+    }
+
+    static void CleanupRenderTarget() {
+        for (uint32_t i = 0; i < RTL_NUMBER_OF(g_Frames); ++i) {
+            if (g_Frames[i].Fence) {
+                vkDestroyFence(g_Device, g_Frames[i].Fence, g_Allocator);
+                g_Frames[i].Fence = VK_NULL_HANDLE;
+            }
+            if (g_Frames[i].CommandBuffer) {
+                vkFreeCommandBuffers(g_Device, g_Frames[i].CommandPool, 1, &g_Frames[i].CommandBuffer);
+                g_Frames[i].CommandBuffer = VK_NULL_HANDLE;
+            }
+            if (g_Frames[i].CommandPool) {
+                vkDestroyCommandPool(g_Device, g_Frames[i].CommandPool, g_Allocator);
+                g_Frames[i].CommandPool = VK_NULL_HANDLE;
+            }
+            if (g_Frames[i].BackbufferView) {
+                vkDestroyImageView(g_Device, g_Frames[i].BackbufferView, g_Allocator);
+                g_Frames[i].BackbufferView = VK_NULL_HANDLE;
+            }
+            if (g_Frames[i].Framebuffer) {
+                vkDestroyFramebuffer(g_Device, g_Frames[i].Framebuffer, g_Allocator);
+                g_Frames[i].Framebuffer = VK_NULL_HANDLE;
+            }
+        }
+
+        for (uint32_t i = 0; i < RTL_NUMBER_OF(g_FrameSemaphores); ++i) {
+            if (g_FrameSemaphores[i].ImageAcquiredSemaphore) {
+                vkDestroySemaphore(g_Device, g_FrameSemaphores[i].ImageAcquiredSemaphore, g_Allocator);
+                g_FrameSemaphores[i].ImageAcquiredSemaphore = VK_NULL_HANDLE;
+            }
+            if (g_FrameSemaphores[i].RenderCompleteSemaphore) {
+                vkDestroySemaphore(g_Device, g_FrameSemaphores[i].RenderCompleteSemaphore, g_Allocator);
+                g_FrameSemaphores[i].RenderCompleteSemaphore = VK_NULL_HANDLE;
+            }
+        }
+    }
+}

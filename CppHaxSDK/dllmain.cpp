@@ -3,93 +3,81 @@
 #include <iostream>
 #include <format>
 
+#include "unity/haxsdk_unity.h"
 #include "haxsdk_logger.h"
 #include "haxsdk_gui.h"
-#include "haxsdk_system.h"
-#include "haxsdk_tools.h"
+//#include "haxsdk_tools.h"
 
 using namespace System;
 
-static FieldInfo EnemyDirector__enemiesSpawned = FieldInfo("Assembly-CSharp", "", "EnemyDirector", "enemiesSpawned");
-static FieldInfo EnemyDirector__instance = FieldInfo("Assembly-CSharp", "", "EnemyDirector", "instance");
-static FieldInfo EnemyParent__enemyName = FieldInfo("Assembly-CSharp", "", "EnemyParent", "enemyName");
+static FieldInfo EnemyDirector_instance("Assembly-CSharp", "", "EnemyDirector", "instance");
+static FieldInfo EnemyDirector_enemiesSpawned("Assembly-CSharp", "", "EnemyDirector", "enemiesSpawned");
+static FieldInfo EnemyParent_Enemy("Assembly-CSharp", "", "EnemyParent", "Enemy");
 
-static backend::Class* v3Class;
+static MethodInfo Camera_WorldToScreenPoint("UnityEngine.CoreModule", "UnityEngine", "Camera", "WorldToScreenPoint", "UnityEngine.Vector3(UnityEngine.Vector3)");
 
-struct EnemyParent : Object
+struct Enemy : Unity::Behaviour
 {
-    String enemyName() const { CHECK_NULL(m_ManagedPtr); return EnemyParent__enemyName.GetValue<String>(m_Object); }
+    
 };
 
-struct EnemyDirector : Object
+struct EnemyParent : Unity::Behaviour
+{
+    Enemy enemy()
+    {
+        CHECK_NULL();
+        return *(Enemy*)EnemyParent_Enemy.GetValuePtr(*this);
+    }
+};
+
+struct EnemyDirector : Unity::Behaviour
 {
     static EnemyDirector instance() 
     { 
-        return EnemyDirector__instance.GetValue<EnemyDirector>(null);
+        return *(EnemyDirector*)EnemyDirector_instance.GetValuePtr(null); 
     }
-
-    List<EnemyParent> enemiesSpawned()
-    {
-        if (!m_ManagedPtr)
-            throw NullReferenceException::New();
-
-        return EnemyDirector__enemiesSpawned.GetValue<List<EnemyParent>>(m_Object);
+    
+    System::List<EnemyParent> enemiesSpawned()
+    { 
+        CHECK_NULL();
+        return *(System::List<EnemyParent>*)EnemyDirector_enemiesSpawned.GetValuePtr(*this);
     }
 };
 
-struct Vector3
-{
-    float x, y, z;
-};
+static bool useEsp = false;
 
-static GCHandle strongHandle = GCHandle(0);
-static GCHandle weakHandle = GCHandle(0);
-
-void RenderMenu()
+void ESP()
 {
-    if (HaxWindow window("Window"); window)
+    if (useEsp)
     {
-        if (ImGui::Button("Setup handles"))
+        Unity::Camera cam = Unity::Camera::GetMain();
+        float screenHeight = (float)Unity::Screen::GetHeight();
+        auto enemies = EnemyDirector::instance().enemiesSpawned();
+        for (auto& enemy : enemies)
         {
-            Vector3 v(1.f, 2.f, 3.f);
-            System::Object weak(backend::Object::Box(v3Class, &v));
-            weakHandle = std::move(GCHandle::New(weak, System::Weak));
-            printf("Weak obj ptr %p\n", weak.m_ManagedPtr);
-
-            Vector3 v2(3.f, 4.f, 5.f);
-            System::Object strong(backend::Object::Box(v3Class, &v2));
-            strongHandle = std::move(GCHandle::New(strong));
-            printf("Strong obj ptr %p\n", strong.m_ManagedPtr);
-        }
-
-        if (ImGui::Button("Print handles"))
-        {
-            printf("Weak handle %d\n", weakHandle.m_Handle);
-            printf("Strong handle %d\n", strongHandle.m_Handle);
-        }
-
-        if (ImGui::Button("Print objects from handles"))
-        {
-            printf("Weak object %p\n", weakHandle.GetTarget().m_ManagedPtr);
-            printf("Strong object %p\n", strongHandle.GetTarget().m_ManagedPtr);
+            printf("Contains %d\n", enemies.Contains(enemy));
         }
     }
 }
 
-void InitializeMenu()
+void RenderMenu()
 {
-    HaxSdk::Log("HELLO!");
+    ImGui::ShowDemoWindow();
+}
+
+void Init()
+{
 }
 
 static void Start() 
 {
     HaxSdk::InitLogger(true);
-    HaxSdk::InitBackend();
-    HaxSdk::AttachThread();
-    HaxSdk::InitSystem();
 
-    v3Class = backend::ReflectionType::GetClass(System::AppDomain::GetRootDomain().Load("UnityEngine.CoreModule", true).GetType("UnityEngine", "Vector3").m_Type);
-    HaxSdk::ImplementImGui(GraphicsApi_DirectX11, InitializeMenu, nullptr, RenderMenu);
+    HaxSdk::InitUnity();
+
+    unsafe::Thread* thread = unsafe::Thread::Attach();
+    
+    HaxSdk::ImplementImGui(GraphicsApi_DirectX11, nullptr, nullptr, RenderMenu);
 }
 
 bool __stdcall DllMain(HMODULE module, DWORD reason, LPVOID lpvReserved) {

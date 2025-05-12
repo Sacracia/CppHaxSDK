@@ -5,9 +5,9 @@
 
 #include <cstdint>
 
+#include "../haxsdk_backend.h"
 #include "../../haxsdk_logger.h"
 #include "../../haxsdk_assertion.h"
-#include "../haxsdk_backend.h"
 
 #define GET_BACKEND_API(n)                          \
     n = (t ## _ ## n)(GetProcAddress(handle, #n));  \
@@ -54,101 +54,7 @@ using t_il2cpp_gchandle_new                 = uint32_t (*)(Il2CppObject*, bool);
 using t_il2cpp_gchandle_new_weakref         = uint32_t (*)(Il2CppObject*, bool);
 using t_il2cpp_gchandle_get_target          = Il2CppObject* (*)(uint32_t);
 using t_il2cpp_gchandle_free                = void (*)(uint32_t);
-
-struct Il2CppObject
-{
-    union
-    {
-        Il2CppClass* Klass;
-        Il2CppVTable* Vtable;
-    };
-    MonitorData* Monitor;
-};
-
-struct Il2CppDomain
-{
-    Il2CppAppDomain* Domain;
-    Il2CppAppDomainSetup* Setup;
-    Il2CppAppContext* DefaultContext;
-    const char* FriendlyName;
-    // ...
-};
-
-struct Il2CppAssemblyName
-{
-    const char* Name;
-    const char* Culture;
-    const char* HashValue;
-    const char* PublicKey;
-    // ...
-};
-
-struct Il2CppAssembly
-{
-    Il2CppImage* Image;
-    uint32_t Token;
-    int32_t ReferencedAssemblyStart;
-    int32_t ReferencedAssemblyCount;
-    Il2CppAssemblyName AName;
-};
-
-struct Il2CppString : Il2CppObject
-{
-    int32_t length;                             ///< Length of string *excluding* the trailing null (which is included in 'chars').
-    wchar_t chars[1];
-};
-
-struct Il2CppException : Il2CppObject
-{
-#if !defined(NET_4_0)
-    /* Stores the IPs and the generic sharing infos
-       (vtable/MRGCTX) of the frames. */
-    Il2CppArray* trace_ips;
-    Il2CppException* inner_ex;
-    Il2CppString* message;
-    Il2CppString* help_link;
-    Il2CppString* class_name;
-    Il2CppString* stack_trace;
-#else
-    Il2CppString* className;
-    Il2CppString* message;
-    Il2CppObject* _data;
-    Il2CppException* inner_ex;
-    Il2CppString* _helpURL;
-    Il2CppArray<void*>* trace_ips;
-    Il2CppString* stack_trace;
-#endif
-};
-
-struct Il2CppType
-{
-    union
-    {
-        int32_t klassIndex; /* for VALUETYPE and CLASS */
-        const Il2CppType* type;   /* for PTR and SZARRAY */
-        Il2CppArrayType* array; /* for ARRAY */
-        //MonoMethodSignature *method;
-        int32_t genericParameterIndex; /* for VAR and MVAR */
-        Il2CppGenericClass* generic_class; /* for GENERICINST */
-    };
-    unsigned int attrs : 16; /* param attributes or field flags */
-    /*...*/
-};
-
-struct Il2CppField
-{
-    const char* name;
-    const Il2CppType* type;
-    Il2CppClass* parent;
-    int32_t offset; // If offset is -1, then it's thread static
-    uint32_t token;
-};
-
-struct Il2CppMethod
-{
-    void* methodPointer;
-    /*...*/
-};
+using t_il2cpp_class_from_il2cpp_type       = Il2CppClass* (*)(Il2CppType*);
 
 static t_il2cpp_object_new                  il2cpp_object_new;
 static t_il2cpp_object_unbox                il2cpp_object_unbox;
@@ -184,8 +90,7 @@ static t_il2cpp_gchandle_new                il2cpp_gchandle_new;
 static t_il2cpp_gchandle_new_weakref        il2cpp_gchandle_new_weakref;
 static t_il2cpp_gchandle_get_target         il2cpp_gchandle_get_target;
 static t_il2cpp_gchandle_free               il2cpp_gchandle_free;
-
-static void GetMethodSignature(Il2CppMethod* method, char* buff, size_t buffSize);
+static t_il2cpp_class_from_il2cpp_type      il2cpp_class_from_il2cpp_type;
 
 namespace il2cpp
 {
@@ -226,277 +131,7 @@ namespace il2cpp
         GET_BACKEND_API(il2cpp_gchandle_new_weakref);
         GET_BACKEND_API(il2cpp_gchandle_get_target);
         GET_BACKEND_API(il2cpp_gchandle_free);
-    }
-
-    Il2CppImage* Assembly::GetImage(Il2CppAssembly* assembly)
-    {
-        HAX_ASSERT(assembly);
-        return il2cpp_assembly_get_image(assembly);
-    }
-
-    Il2CppAssembly* Assembly::Load(Il2CppDomain* domain, const char* name)
-    {
-        HAX_ASSERT(domain);
-        return il2cpp_domain_assembly_open(domain, name);
-    }
-
-    Il2CppClass* Class::FromName(Il2CppImage* image, const char* nameSpace, const char* name)
-    {
-        HAX_ASSERT(image);
-        return il2cpp_class_from_name(image, nameSpace, name);
-    }
-
-    Il2CppClass* Class::FromSystemType(Il2CppReflectionType* type)
-    {
-        HAX_ASSERT(type);
-        return il2cpp_class_from_system_type(type);
-    }
-
-    Il2CppField* Class::GetFieldFromName(Il2CppClass* klass, const char* name)
-    {
-        HAX_ASSERT(klass);
-        return il2cpp_class_get_field_from_name(klass, name);
-    }
-
-    Il2CppMethod* Class::GetMethodFromName(Il2CppClass* klass, const char* name, const char* signature)
-    {
-        void* iter = nullptr;
-        while (Il2CppMethod* method = il2cpp_class_get_methods(klass, &iter))
-        {
-            const char* methodName = il2cpp_method_get_name(method);
-            if (strcmp(methodName, name) == 0)
-            {
-                if (!signature || !signature[0])
-                    return method;
-
-                char buff[256] = { 0 };
-                GetMethodSignature(method, buff, sizeof(buff));
-                if (strcmp(buff, signature) == 0)
-                    return method;
-            }
-        }
-        return nullptr;
-    }
-
-    void* Class::GetStaticFieldData(Il2CppClass* klass)
-    {
-        HAX_ASSERT(klass);
-        return il2cpp_class_get_static_field_data(klass);
-    }
-
-    Il2CppType* Class::GetType(Il2CppClass* klass)
-    {
-        HAX_ASSERT(klass);
-        return il2cpp_class_get_type(klass);
-    }
-
-    Il2CppDomain* Domain::GetCurrent()
-    {
-        return il2cpp_domain_get();
-    }
-
-    Il2CppString* Exception::GetMessage(Il2CppException* ex)
-    {
-        HAX_ASSERT(ex);
-        return ex->message;
-    }
-
-    Il2CppException* Exception::GetNullReferenceException()
-    {
-        Il2CppImage* image = il2cpp_get_corlib();
-        Il2CppClass* klass = il2cpp_class_from_name(image, "System", "NullReferenceException");
-        Il2CppObject* ex = Object::New(klass);
-        Runtime::ObjectInit(ex);
-        return (Il2CppException*)ex;
-    }
-
-    Il2CppException* Exception::GetArgumentOutOfRangeException()
-    {
-        Il2CppImage* image = il2cpp_get_corlib();
-        Il2CppClass* klass = il2cpp_class_from_name(image, "System", "ArgumentOutOfRangeException");
-        Il2CppObject* ex = Object::New(klass);
-        Runtime::ObjectInit(ex);
-        return (Il2CppException*)ex;
-    }
-
-    bool Field::IsStatic(Il2CppField* field)
-    {
-        HAX_ASSERT(field);
-        return field->type->attrs & FIELD_ATTRIBUTE_STATIC;
-    }
-
-    size_t Field::GetOffset(Il2CppField* field)
-    {
-        HAX_ASSERT(field);
-        return static_cast<size_t>(field->offset);
-    }
-
-    Il2CppClass* Field::GetParent(Il2CppField* field)
-    {
-        HAX_ASSERT(field);
-        return field->parent;
-    }
-
-    void* Field::GetAddress(Il2CppField* field, Il2CppObject* __this)
-    {
-        if (IsStatic(field))
-            return (char*)Class::GetStaticFieldData(field->parent) + field->offset;
-
-        HAX_ASSERT_E(__this, "THIS not provided for non-static field");
-        return (char*)__this + field->offset;
-    }
-
-    void Field::StaticGetValue(Il2CppField* field, void* value)
-    {
-        HAX_ASSERT(field);
-        return il2cpp_field_static_get_value(field, value);
-    }
-
-    void Field::StaticSetValue(Il2CppField* field, void* value)
-    {
-        HAX_ASSERT(field);
-        il2cpp_field_static_set_value(field, value);
-    }
-
-    uint32_t GCHandle::New(Il2CppObject * obj, bool pinned)
-    {
-        HAX_ASSERT(obj);
-        return il2cpp_gchandle_new(obj, pinned);
-    }
-
-    uint32_t GCHandle::NewWeakRef(Il2CppObject* obj, bool trackResurrection)
-    {
-        HAX_ASSERT(obj);
-        return il2cpp_gchandle_new_weakref(obj, trackResurrection);
-    }
-
-    Il2CppObject* GCHandle::GetTaget(uint32_t handle)
-    {
-        HAX_ASSERT(handle);
-        return il2cpp_gchandle_get_target(handle);
-    }
-
-    void GCHandle::Free(uint32_t handle)
-    {
-        HAX_ASSERT(handle);
-        il2cpp_gchandle_free(handle);
-    }
-
-    Il2CppClass* ReflectionType::GetClass(Il2CppReflectionType* type)
-    {
-        return il2cpp_class_from_system_type(type);
-    }
-
-    Il2CppImage* Image::GetCorlib()
-    {
-        return il2cpp_get_corlib();
-    }
-
-    Il2CppAssembly* Image::GetAssembly(Il2CppImage* image)
-    {
-        HAX_ASSERT(image);
-        return il2cpp_image_get_assembly(image);
-    }
-
-    const char* Image::GetName(Il2CppImage* image)
-    {
-        HAX_ASSERT(image);
-        return il2cpp_image_get_name(image);
-    }
-
-    Il2CppClass* Method::GetClass(Il2CppMethod* method)
-    {
-        HAX_ASSERT(method);
-        return il2cpp_method_get_class(method);
-    }
-
-    const char* Method::GetName(Il2CppMethod* method)
-    {
-        HAX_ASSERT(method);
-        return il2cpp_method_get_name(method);
-    }
-
-    Il2CppType* Method::GetParam(Il2CppMethod* method, uint32_t index)
-    {
-        HAX_ASSERT(method);
-        return il2cpp_method_get_param(method, index);
-    }
-
-    int32_t Method::GetParamCount(Il2CppMethod* method)
-    {
-        HAX_ASSERT(method);
-        return il2cpp_method_get_param_count(method);
-    }
-
-    Il2CppType* Method::GetReturnType(Il2CppMethod* method)
-    {
-        HAX_ASSERT(method);
-        return il2cpp_method_get_return_type(method);
-    }
-
-    Il2CppObject* Object::Box(Il2CppClass* klass, void* data)
-    {
-        HAX_ASSERT(klass && data);
-        return il2cpp_value_box(klass, data);
-    }
-
-    Il2CppObject* Object::New(Il2CppClass* klass)
-    {
-        HAX_ASSERT(klass);
-        return il2cpp_object_new(klass);
-    }
-
-    Il2CppClass* Object::GetClass(Il2CppObject* object)
-    {
-        HAX_ASSERT(object);
-        return object->Klass;
-    }
-
-    void* Object::Unbox(Il2CppObject* object)
-    {
-        HAX_ASSERT(object);
-        return il2cpp_object_unbox(object);
-    }
-
-    Il2CppReflectionType* Reflection::TypeGetObject(Il2CppType* type)
-    {
-        HAX_ASSERT(type);
-        return il2cpp_type_get_object(type);
-    }
-
-    Il2CppObject* Runtime::Invoke(Il2CppMethod* method, void* __this, void** args, Il2CppException** ex)
-    {
-        HAX_ASSERT(method);
-        return il2cpp_runtime_invoke(method, __this, args, ex);
-    }
-    
-    void Runtime::ObjectInit(Il2CppObject* object)
-    {
-        HAX_ASSERT(object);
-        return il2cpp_runtime_object_init(object);
-    }
-
-    Il2CppString* String::New(const char* str)
-    {
-        return il2cpp_string_new(str);
-    }
-
-    Il2CppThread* Thread::Attach(Il2CppDomain* domain)
-    {
-        HAX_ASSERT(domain);
-        return il2cpp_thread_attach(domain);
-    }
-
-    void Thread::Detach(Il2CppThread* thread)
-    {
-        HAX_ASSERT(thread);
-        return il2cpp_thread_detach(thread);
-    }
-
-    const char* Type::GetName(Il2CppType* type)
-    {
-        HAX_ASSERT(type);
-        return il2cpp_type_get_name(type);
+        GET_BACKEND_API(il2cpp_class_from_il2cpp_type);
     }
 }
 
@@ -515,4 +150,145 @@ static void GetMethodSignature(Il2CppMethod* method, char* buff, size_t buffSize
         }
     }
     strcat_s(buff, buffSize, ")");
+}
+
+Il2CppObject* Il2CppObject::Box(Il2CppClass* klass, void* data)
+{
+    return il2cpp_value_box(klass, data);
+}
+
+Il2CppObject* Il2CppObject::New(Il2CppClass* klass)
+{
+    return il2cpp_object_new(klass);
+}
+
+void Il2CppObject::Ctor()
+{
+    return il2cpp_runtime_object_init(this);
+}
+
+Il2CppDomain* Il2CppDomain::GetRoot() 
+{ 
+    return il2cpp_domain_get(); 
+}
+
+Il2CppAssembly* Il2CppDomain::GetAssembly(const char* name)
+{ 
+    return il2cpp_domain_assembly_open(il2cpp_domain_get(), name);
+}
+
+Il2CppThread* Il2CppThread::Attach() { return il2cpp_thread_attach(il2cpp_domain_get()); }
+
+void Il2CppThread::Detach() { il2cpp_thread_detach(this); }
+
+
+Il2CppImage* Il2CppAssembly::GetImage()
+{
+    return il2cpp_assembly_get_image(this);
+}
+
+Il2CppImage* Il2CppImage::GetCorlib()
+{
+    return il2cpp_get_corlib();
+}
+
+Il2CppImage* Il2CppImage::GetUnityCore()
+{
+    Il2CppDomain* domain = il2cpp_domain_get();
+    Il2CppAssembly* assembly = domain->GetAssembly("UnityEngine.CoreModule");
+    if (!assembly)
+        domain->GetAssembly("UnityEngine");
+    return assembly ? assembly->GetImage() : nullptr;
+}
+
+Il2CppClass* Il2CppImage::GetClass(const char* nameSpace, const char* name)
+{
+    return il2cpp_class_from_name(this, nameSpace, name);
+}
+
+Il2CppField* Il2CppClass::GetField(const char* name)
+{
+    return il2cpp_class_get_field_from_name(this, name);
+}
+
+Il2CppMethod* Il2CppClass::GetMethod(const char* name, const char* signature)
+{
+    void* iter = nullptr;
+    while (Il2CppMethod* method = il2cpp_class_get_methods(this, &iter))
+    {
+        const char* methodName = il2cpp_method_get_name(method);
+        if (strcmp(methodName, name) == 0)
+        {
+            if (!signature || !signature[0])
+                return method;
+
+            char buff[256] = { 0 };
+            GetMethodSignature(method, buff, sizeof(buff));
+            if (strcmp(buff, signature) == 0)
+                return method;
+        }
+    }
+    return nullptr;
+}
+
+void* Il2CppClass::GetStaticFieldData()
+{
+    return il2cpp_class_get_static_field_data(this);
+}
+
+Il2CppType* Il2CppClass::GetType()
+{
+    return il2cpp_class_get_type(this);
+}
+
+Il2CppObject* Il2CppMethod::Invoke(void* __this, void** args, Il2CppException** ex)
+{
+    return il2cpp_runtime_invoke(this, __this, args, ex);
+}
+
+Il2CppReflectionType* Il2CppType::GetReflectionType()
+{
+    return il2cpp_type_get_object(this);
+}
+
+Il2CppClass* Il2CppType::GetClass()
+{
+    return il2cpp_class_from_il2cpp_type(this);
+}
+
+void Il2CppField::GetStaticValue(void* value)
+{
+    il2cpp_field_static_get_value(this, value);
+}
+
+void* Il2CppField::GetValuePtr(void* __this)
+{
+    if (IsStatic())
+        return (char*)parent->GetStaticFieldData() + offset;
+    return (char*)__this + offset;
+}
+
+Il2CppString* Il2CppString::New(const char* str)
+{
+    return il2cpp_string_new(str);
+}
+
+uint32_t Il2CppGCHandle::New(Il2CppObject* obj, bool pinned)
+{
+    return il2cpp_gchandle_new(obj, pinned);
+}
+
+uint32_t Il2CppGCHandle::NewWeak(Il2CppObject* obj, bool trackResurrection)
+{
+    return il2cpp_gchandle_new_weakref(obj, trackResurrection);
+}
+
+Il2CppObject* Il2CppGCHandle::GetTarget(uint32_t handle)
+{
+    return il2cpp_gchandle_get_target(handle);
+}
+
+void Il2CppGCHandle::Free(uint32_t handle)
+{
+    il2cpp_gchandle_free(handle);
 }

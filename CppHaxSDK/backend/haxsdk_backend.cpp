@@ -3,7 +3,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <TlHelp32.h>
+#include <string.h>
 
+#include <unordered_map>
 #include <vector>
 
 #include "../haxsdk_assertion.h"
@@ -11,26 +13,21 @@
 #include "mono/haxsdk_mono.h"
 #include "il2cpp/haxsdk_il2cpp.h"
 
+#undef GetMessage
+
 static HaxBackend GetBackend(OUT HMODULE& handle);
 
 static HaxBackend g_Backend = HaxBackend_None;
 static HMODULE g_BackendHandle;
 static bool g_Initialized = false;
 
-namespace Metadata
+namespace vtables
 {
-    static void* Int32;
-    static void* Vector3;
-}
-
-static void* GetMetadata(backend::Image* image, const char* nameSpace, const char* name)
-{
-    if (HaxSdk::IsMono())
-    {
-        MonoClass* klass = mono::Class::FromName((MonoImage*)image, nameSpace, name);
-        return mono::Class::VTable(mono::Domain::GetRoot(), klass);
-    }
-    return il2cpp::Class::FromName((Il2CppImage*)image, nameSpace, name);
+    static unsafe::VTable* g_RuntimeType;
+    static unsafe::VTable* g_Vector3;
+    static unsafe::VTable* g_NullReferenceException;
+    static unsafe::VTable* g_ArgumentOutOfRangeException;
+    static unsafe::VTable* g_TargetException;
 }
 
 namespace HaxSdk
@@ -39,25 +36,20 @@ namespace HaxSdk
     {
         if (!g_Initialized)
         {
+            g_Initialized = true;
+
             g_Backend = GetBackend(g_BackendHandle);
-            HAX_ASSERT(g_Backend);
+            HAX_ASSERT_E(g_Backend, "Unable to determine backend");
             IsMono() ? mono::Initialize() : il2cpp::Initialize();
 
-            Metadata::Int32 = GetMetadata(backend::Image::GetCorlib(), "System", "Int32");
-            Metadata::Vector3 = GetMetadata(backend::Assembly::GetImage(backend::Assembly::Load("UnityEngine.CoreModule")), "UnityEngine", "Vector3");
-
-            g_Initialized = true;
+            unsafe::Thread::Attach();
+            unsafe::Image* corlib = unsafe::Image::GetCorlib();
+            vtables::g_RuntimeType = corlib->GetClass("System", "RuntimeType")->GetVTable();
+            vtables::g_Vector3 = unsafe::Image::GetUnityCore()->GetClass("UnityEngine", "Vector3")->GetVTable();
+            vtables::g_NullReferenceException = unsafe::Image::GetCorlib()->GetClass("System", "NullReferenceException")->GetVTable();
+            vtables::g_ArgumentOutOfRangeException = unsafe::Image::GetCorlib()->GetClass("System", "ArgumentOutOfRangeException")->GetVTable();
+            vtables::g_TargetException = unsafe::Image::GetCorlib()->GetClass("System.Reflection", "TargetException")->GetVTable();
         }
-    }
-
-    void AttachThread()
-    {
-        if (IsMono())
-        {
-            mono::Thread::Attach(mono::Domain::GetRoot());
-            return;
-        }
-        il2cpp::Thread::Attach(il2cpp::Domain::GetCurrent());
     }
 
     bool IsMono()
@@ -105,200 +97,228 @@ static HaxBackend GetBackend(OUT HMODULE& handle)
     return HaxBackend_None;
 }
 
-namespace backend
+using namespace HaxSdk;
+namespace unsafe
 {
-    Vector3_Boxed::Vector3_Boxed(float _x, float _y, float _z) : x(_x), y(_y), z(_z), metadata(Metadata::Vector3), monitor(nullptr) {}
-
-    Image* Assembly::GetImage(Assembly* assembly)
+    Image* Assembly::GetImage()
     {
-        return HaxSdk::IsMono()
-            ? (Image*)(mono::Assembly::GetImage((MonoAssembly*)assembly))
-            : (Image*)(il2cpp::Assembly::GetImage((Il2CppAssembly*)assembly));
+        return IsMono() ? (Image*)m_Mono.GetImage() : (Image*)m_Il2Cpp.GetImage();
     }
 
-    Assembly* Assembly::Load(const char* name)
+    Field* Class::GetField(const char* name, bool doAssert)
     {
-        if (HaxSdk::IsMono())
-        {
-            MonoDomain* domain = mono::Domain::GetRoot();
-            return (Assembly*)mono::Assembly::Load(domain, name);
-        }
-
-        Il2CppDomain* domain = il2cpp::Domain::GetCurrent();
-        return (Assembly*)il2cpp::Assembly::Load(domain, name);
+        Field* field = IsMono() ? (Field*)m_Mono.GetField(name) : (Field*)m_Il2Cpp.GetField(name);
+        if (doAssert)
+            HAX_ASSERT_E(field, "Field {} not found", name);
+        return field;
     }
 
-    Class* Class::FromName(Image* image, const char* nameSpace, const char* name)
+    Method* Class::GetMethod(const char* name, const char* sig, bool doAssert)
     {
-        return HaxSdk::IsMono()
-            ? (Class*)mono::Class::FromName((MonoImage*)image, nameSpace, name)
-            : (Class*)il2cpp::Class::FromName((Il2CppImage*)image, nameSpace, name);
+        Method* method = IsMono() ? (Method*)m_Mono.GetMethod(name, sig) : (Method*)m_Il2Cpp.GetMethod(name, sig);
+        if (doAssert)
+            HAX_ASSERT_E(method, "Method {} of {} not found", name, sig ? sig : "...");
+        return method;
     }
 
-    Field* Class::GetFieldFromName(Class* klass, const char* name)
+    Type* Class::GetType()
     {
-        return HaxSdk::IsMono()
-            ? (Field*)mono::Class::GetFieldFromName((MonoClass*)klass, name)
-            : (Field*)il2cpp::Class::GetFieldFromName((Il2CppClass*)klass, name);
+        return IsMono() ? (Type*)m_Mono.GetType() : (Type*)m_Il2Cpp.GetType();
     }
 
-    Method* Class::GetMethodFromName(Class* klass, const char* name, const char* signature)
+    VTable* Class::GetVTable()
     {
-        return HaxSdk::IsMono()
-            ? (Method*)mono::Class::GetMethodFromName((MonoClass*)klass, name, signature)
-            : (Method*)il2cpp::Class::GetMethodFromName((Il2CppClass*)klass, name, signature);
-    }
-
-    Type* Class::GetType(Class* klass)
-    {
-        return HaxSdk::IsMono()
-            ? (Type*)mono::Class::GetType((MonoClass*)klass)
-            : (Type*)il2cpp::Class::GetType((Il2CppClass*)klass);
-    }
-
-    Domain* Domain::GetCurrent()
-    {
-        return HaxSdk::IsMono()
-            ? (Domain*)mono::Domain::GetCurrent()
-            : (Domain*)il2cpp::Domain::GetCurrent();
-    }
-
-    Image* Image::GetCorlib()
-    {
-        return HaxSdk::IsMono()
-            ? (Image*)mono::Image::GetCorlib()
-            : (Image*)il2cpp::Image::GetCorlib();
+        return IsMono() ? (VTable*)m_Mono.GetVTable() : (VTable*)this;
     }
 
     Domain* Domain::GetRoot()
     {
-        return HaxSdk::IsMono()
-            ? (Domain*)mono::Domain::GetRoot()
-            : (Domain*)il2cpp::Domain::GetCurrent();
+        return IsMono() ? (Domain*)MonoDomain::GetRoot() : (Domain*)Il2CppDomain::GetRoot();
     }
 
-    const char* Exception::GetMessage(Exception* ex)
+    Assembly* Domain::GetAssembly(const char* name, bool doAssert)
     {
-        String* str = HaxSdk::IsMono()
-            ? (String*)mono::Exception::GetMessage((MonoException*)ex)
-            : (String*)il2cpp::Exception::GetMessage((Il2CppException*)ex);
-        return HaxSdk::UTF8(str->m_Chars, str->m_Length);
+        Assembly* assembly = IsMono() ? (Assembly*)m_Mono.GetAssembly(name) : (Assembly*)m_Il2Cpp.GetAssembly(name);
+        if (doAssert)
+            HAX_ASSERT_E(assembly, "Assembly {} not found", name);
+        return assembly;
     }
 
-    Exception* Exception::GetNullReferenceException()
+    Image* Domain::GetImage(const char* name, bool doAssert)
     {
-        return HaxSdk::IsMono()
-            ? (Exception*)mono::Exception::GetNullReferenceException()
-            : (Exception*)il2cpp::Exception::GetNullReferenceException();
+        Assembly* assembly = GetAssembly(name, doAssert);
+        return assembly ? assembly->GetImage() : nullptr;
     }
 
-    Exception* Exception::GetArgumentOutOfRangeException()
-    {
-        return HaxSdk::IsMono()
-            ? (Exception*)mono::Exception::GetArgumentOutOfRangeException()
-            : (Exception*)il2cpp::Exception::GetArgumentOutOfRangeException();
+    String*& Exception::GetMessage()
+    { 
+        return HaxSdk::IsMono() ? (String*&)ToMono()->GetMessage() : (String*&)ToIl2Cpp()->GetMessage(); 
     }
 
-    void* Field::GetAddress(Field* field, Object* __this)
+    String* Exception::GetStackTrace()
     {
-        return HaxSdk::IsMono()
-            ? mono::Field::GetAddress((MonoClassField*)field, (MonoObject*)__this)
-            : il2cpp::Field::GetAddress((Il2CppField*)field, (Il2CppObject*)__this);
+        return HaxSdk::IsMono() ? (String*)ToMono()->GetStackTrace() : (String*)ToIl2Cpp()->GetStackTrace();
     }
 
-    Class* Field::GetParent(Field* field)
+    Exception* Exception::GetNullReference()
     {
-        return HaxSdk::IsMono()
-            ? (Class*)mono::Field::GetParent((MonoClassField*)field)
-            : (Class*)il2cpp::Field::GetParent((Il2CppField*)field);
+        return (Exception*)Object::New(vtables::g_NullReferenceException->GetClass())->Ctor();
     }
 
-    void Field::StaticGetValue(Field* field, void* value)
+    Exception* Exception::GetArgumentOutOfRange()
     {
-        if (HaxSdk::IsMono())
-        {
-            MonoClass* klass = mono::Field::GetParent((MonoClassField*)field);
-            MonoVTable* vtable = mono::Class::VTable(mono::Domain::GetRoot(), klass);
-            mono::Field::StaticGetValue(vtable, (MonoClassField*)field, value);
-            return;
-        }
-        il2cpp::Field::StaticGetValue((Il2CppField*)field, value);
+        return (Exception*)Object::New(vtables::g_ArgumentOutOfRangeException->GetClass())->Ctor();
     }
 
-    void Field::StaticSetValue(Field* field, void* value)
+    Exception* Exception::GetTargetException(String* message)
     {
-        if (HaxSdk::IsMono())
-        {
-            MonoClass* klass = mono::Field::GetParent((MonoClassField*)field);
-            MonoVTable* vtable = mono::Class::VTable(mono::Domain::GetRoot(), klass);
-            mono::Field::StaticSetValue(vtable, (MonoClassField*)field, value);
-            return;
-        }
-        il2cpp::Field::StaticSetValue((Il2CppField*)field, value);
+        Exception* ex = (Exception*)Object::New(vtables::g_TargetException->GetClass())->Ctor();
+        ex->GetMessage() = message;
+        return ex;
     }
 
-    ReflectionType* Reflection::TypeGetObject(Type* type)
-    {
-        if (HaxSdk::IsMono())
-        {
-            MonoDomain* domain = mono::Domain::GetRoot();
-            return (ReflectionType*)mono::Reflection::TypeGetObject(domain, (MonoType*)type);
-        }
-        return (ReflectionType*)il2cpp::Reflection::TypeGetObject((Il2CppType*)type);
+    bool Field::IsStatic() 
+    { 
+        return HaxSdk::IsMono() ? m_Mono.IsStatic() : m_Il2Cpp.IsStatic(); 
+    }
+    
+    int Field::GetOffset() 
+    { 
+        return HaxSdk::IsMono() ? m_Mono.GetOffset() : m_Il2Cpp.GetOffset(); 
     }
 
-    ReflectionType* Object::GetType(Object* object)
-    {
-        Class* klass = Object::GetClass(object);
-        return Reflection::TypeGetObject(Class::GetType(klass));
+    const char* Field::GetName()
+    { 
+        return HaxSdk::IsMono() ? m_Mono.GetName() : m_Il2Cpp.GetName(); 
+    }
+    void Field::GetStaticValue(void* value)
+    { 
+        return HaxSdk::IsMono() ? m_Mono.GetStaticValue(value) : m_Il2Cpp.GetStaticValue(value); 
     }
 
-    Object* Object::Box(Class* klass, void* data)
+    bool Field::IsLiteral()
+    { 
+        return HaxSdk::IsMono() ? m_Mono.IsLiteral() : m_Il2Cpp.IsLiteral(); 
+    }
+
+    void* Field::GetValuePtr(void* __this)
     {
-        return HaxSdk::IsMono()
-            ? (Object*)mono::Object::Box(mono::Domain::GetRoot(), (MonoClass*)klass, data)
-            : (Object*)il2cpp::Object::Box((Il2CppClass*)klass, data);
+        HAX_ASSERT_E(!IsLiteral(), "Use GetStaticValue for literals");
+        HAX_ASSERT_E(__this || IsStatic(), "THIS not provided for non-static field {}", GetName());
+        return IsMono() ? m_Mono.GetValuePtr(__this) : m_Il2Cpp.GetValuePtr(__this);
     }
 
     uint32_t GCHandle::New(Object* obj, bool pinned)
     {
-        return HaxSdk::IsMono()
-            ? mono::GCHandle::New((MonoObject*)obj, pinned)
-            : il2cpp::GCHandle::New((Il2CppObject*)obj, pinned);
+        return HaxSdk::IsMono() ? MonoGCHandle::New((MonoObject*)obj, pinned) : Il2CppGCHandle::New((Il2CppObject*)obj, pinned);
     }
 
-    uint32_t GCHandle::NewWeakRef(Object* obj, bool trackResurrection)
+    uint32_t GCHandle::NewWeak(Object* obj, bool trackResurrection)
     {
-        return HaxSdk::IsMono()
-            ? mono::GCHandle::NewWeakRef((MonoObject*)obj, trackResurrection)
-            : il2cpp::GCHandle::NewWeakRef((Il2CppObject*)obj, trackResurrection);
+        return HaxSdk::IsMono() ? MonoGCHandle::NewWeak((MonoObject*)obj, trackResurrection) : Il2CppGCHandle::NewWeak((Il2CppObject*)obj, trackResurrection);
     }
 
     Object* GCHandle::GetTarget(uint32_t handle)
     {
-        return HaxSdk::IsMono()
-            ? (Object*)mono::GCHandle::GetTaget(handle)
-            : (Object*)il2cpp::GCHandle::GetTaget(handle);
+        return HaxSdk::IsMono() ? (Object*)MonoGCHandle::GetTarget(handle) : (Object*)Il2CppGCHandle::GetTarget(handle);
     }
 
     void GCHandle::Free(uint32_t handle)
     {
-        HaxSdk::IsMono()
-            ? mono::GCHandle::Free(handle)
-            : il2cpp::GCHandle::Free(handle);
+        HaxSdk::IsMono() ? MonoGCHandle::Free(handle) : Il2CppGCHandle::Free(handle);
     }
 
-    Class* ReflectionType::GetClass(ReflectionType* type)
+    Image* Image::GetCorlib()
     {
-        return HaxSdk::IsMono()
-            ? (Class*)mono::ReflectionType::GetClass((MonoReflectionType*)type)
-            : (Class*)il2cpp::ReflectionType::GetClass((Il2CppReflectionType*)type);
+        return IsMono() ? (Image*)MonoImage::GetCorlib() : (Image*)Il2CppImage::GetCorlib();
     }
 
-    Class* Object::GetClass(Object* object)
+    Image* Image::GetUnityCore()
     {
-        return HaxSdk::IsMono()
-            ? (Class*)mono::Object::GetClass((MonoObject*)object)
-            : (Class*)il2cpp::Object::GetClass((Il2CppObject*)object);
+        static Image* image = IsMono() ? (Image*)MonoImage::GetUnityCore() : (Image*)Il2CppImage::GetUnityCore();
+        HAX_ASSERT_E(image, "Unable to find Unity core module");
+        return image;
+    }
+
+    Class* Image::GetClass(const char* nameSpace, const char* name, bool doAssert)
+    {
+        Class* klass = IsMono() ? (Class*)m_Mono.GetClass(nameSpace, name) : (Class*)m_Il2Cpp.GetClass(nameSpace, name);
+        if (doAssert)
+            HAX_ASSERT_E(klass, "Class {}.{} not found", nameSpace, name);
+        return klass;
+    }
+
+    void* Method::GetPointer()
+    {
+        return IsMono() ? m_Mono.GetPointer() : m_Il2Cpp.GetPointer();
+    }
+
+    Object* Method::Invoke(void* __this, void** args, Exception** ex)
+    {
+        return HaxSdk::IsMono() ? (Object*)m_Mono.Invoke(__this, args, (MonoException**)ex) : (Object*)m_Il2Cpp.Invoke(__this, args, (Il2CppException**)ex);
+    }
+
+    Object* Object::New(Class* klass)
+    {
+        return HaxSdk::IsMono() ? (Object*)(MonoObject::New((MonoClass*)klass)) : (Object*)(Il2CppObject::New((Il2CppClass*)klass));
+    }
+
+    Object* Object::Ctor()
+    {
+        HaxSdk::IsMono() ? ((MonoObject*)this)->Ctor() : ((Il2CppObject*)this)->Ctor();
+        return this;
+    }
+
+    Object* Object::Box(Class* klass, void* data)
+    {
+        return IsMono() ? (Object*)MonoObject::Box(&klass->m_Mono, data) : (Object*)Il2CppObject::Box(&klass->m_Il2Cpp, data);
+    }
+
+    Class* Object::GetClass()
+    {
+        return IsMono() ? (Class*)((MonoObject*)this)->GetClass() : (Class*)((Il2CppObject*)this)->GetClass();
+    }
+
+    ReflectionType::ReflectionType(Type* type) : Object(vtables::g_RuntimeType), m_Type(type)
+    {
+
+    }
+
+    String* String::New(const char* str)
+    {
+        return HaxSdk::IsMono() ? (String*)MonoString::New(str) : (String*)Il2CppString::New(str);
+    }
+
+    Thread* Thread::Attach()
+    {
+        return IsMono() ? (Thread*)MonoThread::Attach() : (Thread*)Il2CppThread::Attach();
+    }
+
+    void Thread::Detach()
+    {
+        IsMono() ? m_Mono.Detach() : m_Il2Cpp.Detach();
+    }
+
+    ReflectionType* Type::GetReflectionType()
+    {
+        static std::unordered_map<Type*, ReflectionType> cache;
+        if (!cache.contains(this))
+            cache[this] = ReflectionType(this);
+        return &cache[this];
+    }
+
+    ReflectionType* Type::CreateReflectionType()
+    {
+        return HaxSdk::IsMono() ? (ReflectionType*)m_Mono.GetReflectionType() : (ReflectionType*)m_Il2Cpp.GetReflectionType();
+    }
+
+    Class* Type::GetClass()
+    {
+        return HaxSdk::IsMono() ? (Class*)m_Mono.GetClass() : (Class*)m_Il2Cpp.GetClass();
+    }
+
+    Class* VTable::GetClass()
+    {
+        return HaxSdk::IsMono() ? (Class*)m_Mono.klass : (Class*)this;
     }
 }

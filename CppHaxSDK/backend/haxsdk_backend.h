@@ -2,7 +2,24 @@
 
 #include <cstdint>
 
+#include "mono/haxsdk_mono.h"
+#include "il2cpp/haxsdk_il2cpp.h"
+
 #undef GetMessage
+
+#define ALIGN(x) __declspec(align(x))
+
+namespace unsafe
+{
+    struct Class;
+    struct Field;
+    struct Image;
+    struct Method;
+    struct ReflectionType;
+    struct String;
+    struct Type;
+    struct VTable;
+}
 
 enum HaxBackend
 {
@@ -20,211 +37,242 @@ namespace HaxSdk
     void* GetBackendHandle();
 }
 
-namespace backend
+namespace unsafe
 {
-    struct Assembly;
-    struct Class;
-    struct Domain;
-    struct Field;
-    struct Image;
-    struct Method;
-    struct Object;
-    struct Runtime;
-    struct ReflectionType;
-    struct Signature;
-    struct String;
-    struct Thread;
-    struct Type;
-    struct Reflection;
-    struct VTable;
+    struct Object
+    {
+        explicit            Object(VTable* vtable) : m_VTable(vtable), m_Monitor(nullptr) {}
+
+        static Object*      Box(Class* klass, void* data);
+        static Object*      New(Class* klass);
+        
+        Object*             Ctor();
+        Class*              GetClass();
+
+        VTable*             m_VTable;
+        void*               m_Monitor;
+    };
+
+    template <typename T>
+    struct Array : Object
+    {
+        inline T&           operator[](size_t i)            { return m_Items[i]; }
+        inline const T&     operator[](size_t i) const      { return m_Items[i]; }
+
+        inline T*           begin()                         { return m_Items; }
+        inline const T*     begin() const                   { return m_Items; }
+        inline T*           end()                           { return m_Items + m_Size; }
+        inline const T*     end() const                     { return m_Items + m_Size; }
+
+        inline size_t       GetLength()                     { return m_Size; }
+
+    private:
+        void*               m_Bounds;
+        size_t              m_Size;
+        ALIGN(8) T          m_Items[1];
+    };
 
     struct Assembly
     {
-        static Image* GetImage(Assembly* assembly);
-        static Assembly* Load(const char* name);
+        Image*              GetImage();
+
+        union
+        {
+            MonoAssembly    m_Mono;
+            Il2CppAssembly  m_Il2Cpp;
+        };
     };
 
     struct Class
     {
-        static Class* FromName(Image* image, const char* nameSpace, const char* name);
-        static Field* GetFieldFromName(Class* klass, const char* name);
-        static Method* GetMethodFromName(Class* klass, const char* name, const char* signature);
-        //static const char* GetName(Class* klass);
-        //static const char* GetNamespace(Class* klass);
-        static Type* GetType(Class* klass);
+        Field*              GetField(const char* name, bool doAssert = true);
+        Method*             GetMethod(const char* name, const char* sig = nullptr, bool doAssert = true);
+        Type*               GetType();
+        VTable*             GetVTable();
+
+        union
+        {
+            MonoClass       m_Mono;
+            Il2CppClass     m_Il2Cpp;
+        };
     };
 
     struct Domain
     {
-        static Domain* GetCurrent();
-        static Domain* GetRoot();
+        static Domain*      GetRoot();
+        Assembly*           GetAssembly(const char* name, bool doAssert = true);
+        Image*              GetImage(const char* name, bool doAssert = true);
+
+        union
+        {
+            Il2CppDomain    m_Il2Cpp;
+            MonoDomain      m_Mono;
+        };
     };
 
-    struct Exception
+    struct Exception : Object
     {
-        static const char* GetMessage(Exception* ex);
-        static Exception* GetNullReferenceException();
-        static Exception* GetArgumentOutOfRangeException();
+        String*&            GetMessage();
+        String*             GetStackTrace();
+
+        static Exception*   GetNullReference();
+        static Exception*   GetArgumentOutOfRange();
+        static Exception*   GetTargetException(String* message);
+
+        inline MonoException*   ToMono()                    { return (MonoException*)this; }
+        inline Il2CppException* ToIl2Cpp()                  { return (Il2CppException*)this; }
+
+        //union
+        //{
+        //    MonoException m_Mono;
+        //    Il2CppException m_Il2Cpp;
+        //};
     };
 
     struct Field
     {
-        static void* GetAddress(Field* field, Object* __this);
-        static Class* GetParent(Field* field);
-        static void StaticGetValue(Field* field, void* value);
-        static void StaticSetValue(Field* field, void* value);
-    };
+        bool                IsStatic();
+        int                 GetOffset();
+        const char*         GetName();
+        void                GetStaticValue(void* value);
+        bool                IsLiteral();
+        void*               GetValuePtr(void* __this);
 
-    struct Image
-    {
-        static Image* GetCorlib();
-        static Assembly* GetAssembly(Image* image);
-        const char* GetName(Image* image);
-    };
-
-    struct Reflection
-    {
-        static ReflectionType* TypeGetObject(Type* type);
-    };
-
-    struct String
-    {
-        inline wchar_t& operator[](size_t i) { return m_Chars[i]; }
-        inline const wchar_t& operator[](size_t i) const { return m_Chars[i]; }
-
-        inline wchar_t* begin() { return m_Chars; }
-        inline const wchar_t* begin() const { return m_Chars; }
-
-        inline wchar_t* end() { return m_Chars + m_Length; }
-        inline const wchar_t* end() const { return m_Chars + m_Length; }
-
-    private:
-        void* __space[2];
-    public:
-        int m_Length;
-        wchar_t m_Chars[1];
-    };
-
-    template <typename T>
-    struct Array
-    {
-        inline T& operator[](size_t i) { return m_Items[i]; }
-        inline const T& operator[](size_t i) const { return m_Items[i]; }
-
-        inline T* begin() { return &m_Items[0]; }
-        inline const T* begin() const { return &m_Items[0]; }
-        inline T* end() { return m_Items + m_Length; }
-        inline const T* end() const { return m_Items + m_Length; }
-
-    private:
-        void* __space[2];
-        void* m_Bounds;
-    public:
-        size_t m_Length;
-        __declspec(align(8)) T m_Items[1];
-    };
-
-    template <typename T>
-    struct List
-    {
-        inline T& operator[](size_t i) { return m_Items->operator[](i); }
-        inline const T& operator[](size_t i) const { return m_Items->operator[](i); }
-
-        inline T* begin() { return m_Items->begin(); }
-        inline const T* begin() const { return m_Items->begin(); }
-        inline T* end() { return m_Items->begin() + m_Length; }
-        inline const T* end() const { return m_Items->begin() + m_Length; }
-
-        inline int32_t GetLength() { return m_Length; }
-        inline int32_t GetCapacity() { return m_Items->m_Length; }
-
-    private:
-        void* __space[2];
-    public:
-        Array<T>* m_Items;
-        int32_t m_Length;
-        int32_t m_Version;
-        void* m_SyncRoot;
-    };
-
-    struct Object
-    {
-        static ReflectionType* GetType(Object* object);
-        static Object* Box(Class* klass, void* data);
-        static Class* GetClass(Object* object);
-        static Object* New(Domain* domain, Class* klass);
-        static void* Unbox(Object* object);
+        union
+        {
+            MonoField       m_Mono;
+            Il2CppField     m_Il2Cpp;
+        };
     };
 
     struct GCHandle
     {
-        static uint32_t New(Object* obj, bool pinned);
-        static uint32_t NewWeakRef(Object* obj, bool trackResurrection);
-        static Object* GetTarget(uint32_t handle);
-        static void Free(uint32_t handle);
+        static uint32_t     New(Object* obj, bool pinned);
+        static uint32_t     NewWeak(Object* obj, bool trackResurrection);
+        static Object*      GetTarget(uint32_t handle);
+        static void         Free(uint32_t handle);
     };
 
-    struct Type
+    struct Image
     {
-        static char* GetName(Type* type);
+        static Image*       FromName();
+        static Image*       GetCorlib();
+        static Image*       GetUnityCore();
+
+        Class*              GetClass(const char* nameSpace, const char* name, bool doAssert = true);
+    
+        union
+        {
+            MonoImage       m_Mono;
+            Il2CppImage     m_Il2Cpp;
+        };
     };
 
-    struct ReflectionType
+    template <typename T>
+    struct List : Object
     {
-        static Class* GetClass(ReflectionType* type);
+        inline T&           operator[](size_t i)            { return m_Items->operator[](i); }
+        inline const T&     operator[](size_t i) const      { return m_Items->operator[](i); }
+
+        inline T*           begin()                         { return m_Items->begin(); }
+        inline const T*     begin() const                   { return m_Items->begin(); }
+        inline T*           end()                           { return m_Items->begin() + m_Size; }
+        inline const T*     end() const                     { return m_Items->begin() + m_Size; }
+
+        inline int          GetLength()                     { return m_Size; }
+        inline size_t       GetCapacity()                   { return m_Items->m_Size; }
+
+        Array<T>*           m_Items;
+        int                 m_Size;
+        int                 m_Version;
+        void*               m_SyncRoot;
     };
 
-    struct Vector3_Boxed
+    struct Method
     {
-        Vector3_Boxed(float _x, float _y, float _z);
+        void*               GetPointer();
+        Object*             Invoke(void* __this, void** args, Exception** ex);
+
+        inline void*        GetThunk()                      { return HaxSdk::IsMono() ? m_Mono.GetThunk() : nullptr; }
+
+        union
+        {
+            MonoMethod      m_Mono;
+            Il2CppMethod    m_Il2Cpp;
+        };
+    };
+
+    struct ReflectionType : Object
+    {
+        explicit            ReflectionType(Type* type);
+        explicit            ReflectionType() : Object(nullptr), m_Type(nullptr) {}
+
+        inline Type*        GetType()                       { return m_Type; }
+
+        Type*               m_Type;
+    };
+
+    struct String : Object
+    {
+        inline wchar_t&         operator[](int i)           { return m_Chars[i]; }
+        inline const wchar_t&   operator[](int i) const     { return m_Chars[i]; }
+
+        inline wchar_t*         begin()                     { return m_Chars; }
+        inline const wchar_t*   begin() const               { return m_Chars; }
+        inline wchar_t*         end()                       { return m_Chars + m_Length; }
+        inline const wchar_t*   end() const                 { return m_Chars + m_Length; }
+
+        static String*          New(const char* str);
+
+        inline wchar_t*         GetRawStringData()          { return m_Chars; }
+        inline int              GetLength()                 { return m_Length; }
 
     private:
-        void* metadata;
-        void* monitor;
-        float x, y, z;
-    };
-
-    /*struct Method
-    {
-        static void* Compile(Method* method);
-        static const char* GetName(Method* method);
-        static void* GetUnmanagedThunk(Method* method);
-        static Signature* Signature(Method* method);
-    };
-
-    struct Runtime
-    {
-        static Object* Invoke(Method* method, void* __this, void** args, Exception** ex);
-        static void ObjectInit(Object* object);
-    };
-
-    struct Signature
-    {
-        static uint32_t GetParamCount(Signature* methodSig);
-        static Type* GetParams(Signature* methodSig, void** iter);
-        static Type* GetReturnType(Signature* methodSig);
-    };
-
-    struct String
-    {
-        static String* New(Domain* domain, const char* str);
-        static char* ToUTF8(String* str);
+        int                     m_Length;
+        wchar_t                 m_Chars[1];
     };
 
     struct Thread
     {
-        static Thread* Attach(Domain* domain);
-        static Thread* Current();
-        static void Detach(Thread* thread);
+        static Thread*          Attach();
+        void                    Detach();
+
+        union
+        {
+            MonoThread          m_Mono;
+            Il2CppThread        m_Il2Cpp;
+        };
     };
 
-    struct Reflection
+    struct Type
     {
-        static ReflectionType* GetTypeObject(Domain* domain, Type* type);
+        ReflectionType*         GetReflectionType();
+        ReflectionType*         CreateReflectionType();
+        Class*                  GetClass();
+
+        union
+        {
+            MonoType            m_Mono;
+            Il2CppType          m_Il2Cpp;
+        };
     };
 
     struct VTable
     {
-        static void* GetStaticFieldData(VTable* vtable);
-    };*/
+        Class*                  GetClass();
+
+        union
+        {
+            MonoVTable          m_Mono;
+            Il2CppVTable        m_Il2Cpp;
+        };
+    };
+
+    namespace Unity
+    {
+        struct Object : unsafe::Object
+        {
+            void* m_CachedPtr;
+        };
+    }
 }

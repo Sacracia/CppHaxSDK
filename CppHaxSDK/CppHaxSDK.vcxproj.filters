@@ -108,9 +108,6 @@
     <ClInclude Include="backend\mono\haxsdk_mono.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="backend\haxsdk_backend.h">
-      <Filter>Файлы заголовков</Filter>
-    </ClInclude>
     <ClInclude Include="backend\il2cpp\haxsdk_il2cpp.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
@@ -156,10 +153,19 @@
     <ClInclude Include="haxsdk_assertion.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="haxsdk_system.h">
+    <ClInclude Include="haxsdk_tools.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
-    <ClInclude Include="haxsdk_tools.h">
+    <ClInclude Include="system\haxsdk_system.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="backend\haxsdk_backend.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="unity\haxsdk_unity.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="third_party\imgui\backend\imgui_impl_vulkan.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
@@ -212,19 +218,37 @@
     <ClCompile Include="backend\mono\haxsdk_mono.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
-    <ClCompile Include="backend\haxsdk_backend.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
     <ClCompile Include="backend\il2cpp\haxsdk_il2cpp.cpp">
-      <Filter>Исходные файлы</Filter>
-    </ClCompile>
-    <ClCompile Include="haxsdk_system.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="haxsdk_assertion.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
     <ClCompile Include="haxsdk_tools.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="system\String.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="system\haxsdk_system.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="backend\haxsdk_backend.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="unity\haxsdk_unity.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="unity\object.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="unity\component.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="unity\transform.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\backend\imgui_impl_vulkan.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
   </ItemGroup>
